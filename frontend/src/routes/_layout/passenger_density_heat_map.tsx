@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from "react"
-import { Box, Container, Heading, Text, Flex, IconButton, VStack, Input } from "@chakra-ui/react"
+import { useEffect, useRef, useState } from "react"
+import { Box, Heading, Text, Flex, IconButton, VStack, Input } from "@chakra-ui/react"
 import { createFileRoute } from "@tanstack/react-router"
-import { FiArrowLeft, FiMaximize2, FiMinimize2 } from "react-icons/fi"
 import { useNavigate } from "@tanstack/react-router"
 
 export const Route = createFileRoute("/_layout/passenger_density_heat_map")({
@@ -12,7 +11,6 @@ function StaticHeatmap() {
   const mapRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [startUtc, setStartUtc] = useState("20130912011417")
-  const [endUtc, setEndUtc] = useState("20130912042835")
   // 新增：保存热力图实例
   const heatmapOverlayRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -49,8 +47,8 @@ function StaticHeatmap() {
   // 新增：处理结束日期时间变化
   const handleEndDateTimeChange = (value: string) => {
     setSelectedEndDateTime(value)
-    const utcTimestamp = convertDateTimeToUtc(value)
-    setEndUtc(utcTimestamp)
+    // 暂时注释掉，因为 endUtc 变量已被移除
+    // const utcTimestamp = convertDateTimeToUtc(value)
   }
 
   useEffect(() => {

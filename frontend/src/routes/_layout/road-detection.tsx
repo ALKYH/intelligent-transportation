@@ -1,4 +1,3 @@
-import React from "react"
 import { Container, Heading, Text } from "@chakra-ui/react"
 import { createFileRoute } from "@tanstack/react-router"
 import DetectionUpload from "../../components/RoadDetection/DetectionUpload"

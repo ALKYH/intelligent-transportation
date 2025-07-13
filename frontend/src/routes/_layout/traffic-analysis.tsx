@@ -1,4 +1,3 @@
-import React from "react"
 import { Container, Heading, Tabs, Text } from "@chakra-ui/react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import PassengerCountChart from '../../components/Traffic_analysis/PassengerCountChart'
