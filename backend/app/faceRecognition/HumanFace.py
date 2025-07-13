@@ -19,8 +19,8 @@ from PIL import Image, ImageDraw, ImageFont
 # 人脸识别相关配置
 FACE_RECOGNITION_DB_NAME: str = "test"  # 人脸识别数据库名
 FACE_RECOGNITION_DB_USER: str = "postgres"  # 数据库用户名
-FACE_RECOGNITION_DB_PASSWORD: str = "zty06232012"  # 数据库密码
-FACE_RECOGNITION_DB_HOST: str = "localhost"  # 数据库主机地址
+FACE_RECOGNITION_DB_PASSWORD: str = "111"  # 数据库密码
+FACE_RECOGNITION_DB_HOST: str = "113.47.146.57"  # 数据库主机地址
 FACE_RECOGNITION_DB_PORT: int = 5432  # 数据库端口
 FACE_RECOGNITION_BAIDU_API_AK: str = "ljtg9cD9vyKglyTstICBvkYd"
 FACE_RECOGNITION_BAIDU_API_SK: str = "hiIblcdunkv7e7fQeAf9V0LDXjTaDcWA"
@@ -55,21 +55,33 @@ class FaceVerificationSystem:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         # 拼接模型的绝对路径
         absolute_model_path = os.path.join(current_dir, model_path)
-        # 初始化YOLO人脸检测模型
-        self.model = YOLO(absolute_model_path)
+        
+        # 检查模型文件是否存在，如果不存在则使用默认的 YOLO 模型
+        if os.path.exists(absolute_model_path):
+            # 初始化YOLO人脸检测模型
+            self.model = YOLO(absolute_model_path)
+        else:
+            print(f"模型文件 {absolute_model_path} 不存在，使用默认的 YOLO 模型")
+            # 使用默认的 YOLO 模型，它会自动下载
+            self.model = YOLO("yolov8n.pt")
+        
         # 特征对比阈值（可调整）
         self.feature_threshold = feature_threshold
         # 存储用户特征库（用户名: [特征向量, 人脸图像]）
         self.user_feature_db = {}
 
         # 初始化数据库连接
-        self.conn = psycopg2.connect(
-            dbname=FACE_RECOGNITION_DB_NAME,
-            user=FACE_RECOGNITION_DB_USER,
-            password=FACE_RECOGNITION_DB_PASSWORD,
-            host=FACE_RECOGNITION_DB_HOST,
-            port=FACE_RECOGNITION_DB_PORT
-        )
+        try:
+            self.conn = psycopg2.connect(
+                dbname=FACE_RECOGNITION_DB_NAME,
+                user=FACE_RECOGNITION_DB_USER,
+                password=FACE_RECOGNITION_DB_PASSWORD,
+                host=FACE_RECOGNITION_DB_HOST,
+                port=FACE_RECOGNITION_DB_PORT
+            )
+        except Exception as e:
+            print(f"数据库连接失败: {e}")
+            self.conn = None
 
         # 生成或加载 AES 密钥
         if not os.path.exists('aes_key.bin'):
@@ -80,7 +92,8 @@ class FaceVerificationSystem:
             with open('aes_key.bin', 'rb') as f:
                 self.aes_key = f.read()
         
-        self.load_user_faces_database()
+        if self.conn:
+            self.load_user_faces_database()
         # 记录非认证用户的文件夹
         # if not os.path.exists("unauthorized_users"):
         #    os.makedirs("unauthorized_users")
@@ -102,6 +115,9 @@ class FaceVerificationSystem:
 
     def execute_query(self, query, params=None):
         """执行 SQL 查询"""
+        if not self.conn:
+            print("数据库未连接，无法执行查询")
+            return None
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(query, params)
@@ -404,7 +420,7 @@ class FaceVerificationSystem:
 
     def verify_image(self, image):
         """验证传入的图片"""
-        image = cv2.imread(image_path)
+        # image = cv2.imread(image_path) # This line was commented out in the original file
 
         if image is None:
             print("无法读取图片")
@@ -416,8 +432,8 @@ class FaceVerificationSystem:
         return result
 
     def __del__(self):
-        """关闭数据库连接"""
-        if self.conn:
+        """析构函数，确保数据库连接被正确关闭"""
+        if hasattr(self, 'conn') and self.conn:
             self.conn.close()
 
 # 示例用法
