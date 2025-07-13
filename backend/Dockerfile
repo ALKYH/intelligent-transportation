@@ -1,5 +1,7 @@
 FROM python:3.10
 
+RUN apt-get update && apt-get install -y libgl1
+
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app/
@@ -20,12 +22,25 @@ ENV UV_COMPILE_BYTECODE=1
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#caching
 ENV UV_LINK_MODE=copy
 
+# 安装 CMake 依赖
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        cmake \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project
+
 
 ENV PYTHONPATH=/app
 
