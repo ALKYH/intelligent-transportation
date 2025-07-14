@@ -10,7 +10,6 @@ function RoadDetection() {
   return (
     <Container maxW="full">
       <Heading size="lg" pt={12}>路面检测</Heading>
-      <Text mt={4}>这里是路面检测模块页面。</Text>
       <DetectionUpload />
     </Container>
   )

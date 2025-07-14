@@ -210,25 +210,26 @@ export default function DetectionUpload() {
                 <Image
                   src={imagePreview}
                   alt="预览"
-                  maxH="300px"
+                  maxH="500px"
+                  maxW="800px"
                   mx="auto"
                   borderRadius="md"
                   ref={imageRef}
-                  style={{ display: "block", maxWidth: "100%", height: "auto" }}
+                  style={{ display: "block", width: "auto", height: "auto", maxWidth: "800px", maxHeight: "500px" }}
                 />
                 {/* 画框Canvas */}
-                {imageSize && (
+                {imageRef.current && imageRef.current.width && imageRef.current.height && (
                   <canvas
                     ref={imageCanvasRef}
-                    width={imageSize.width}
-                    height={imageSize.height}
+                    width={imageRef.current.width}
+                    height={imageRef.current.height}
                     style={{
                       position: "absolute",
                       left: 0,
                       top: 0,
                       pointerEvents: "none",
-                      width: imageRef.current ? imageRef.current.width : undefined,
-                      height: imageRef.current ? imageRef.current.height : undefined,
+                      width: imageRef.current.width,
+                      height: imageRef.current.height,
                       zIndex: 2,
                     }}
                   />
