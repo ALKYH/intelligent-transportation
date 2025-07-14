@@ -17,7 +17,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
 # 人脸识别相关配置
-FACE_RECOGNITION_DB_NAME: str = "test"  # 人脸识别数据库名
+FACE_RECOGNITION_DB_NAME: str = "app"  # 人脸识别数据库名
 FACE_RECOGNITION_DB_USER: str = "postgres"  # 数据库用户名
 FACE_RECOGNITION_DB_PASSWORD: str = "111"  # 数据库密码
 FACE_RECOGNITION_DB_HOST: str = "113.47.146.57"  # 数据库主机地址
@@ -132,34 +132,51 @@ class FaceVerificationSystem:
 
     def register_user_database(self, username, face_image):
         """注册新用户到数据库，存储人脸图片"""
-        if isinstance(face_image, np.ndarray):
-            _, img_encoded = cv2.imencode('.jpg', face_image)
-            img_bytes = img_encoded.tobytes()
-            base64_image = base64.b64encode(img_bytes)
-            encrypted_image = encrypt_data(base64_image, self.aes_key)
-            query = sql.SQL("INSERT INTO user_faces (username, face_image) VALUES (%s, %s)")
-            self.execute_query(query, (username, encrypted_image))
-
-        else:
-            print("输入的人脸图片格式不正确，应为 numpy.ndarray 类型")
+        try:
+            if isinstance(face_image, np.ndarray):
+                _, img_encoded = cv2.imencode('.jpg', face_image)
+                img_bytes = img_encoded.tobytes()
+                base64_image = base64.b64encode(img_bytes)
+                encrypted_image = encrypt_data(base64_image, self.aes_key)
+                query = sql.SQL("INSERT INTO user_faces (username, face_image) VALUES (%s, %s)")
+                result = self.execute_query(query, (username, encrypted_image))
+                
+                # 同时更新内存中的特征库
+                features = self.extract_features(face_image)
+                if features is not None:
+                    self.user_feature_db[username] = {"features": features, "timestamp": datetime.now()}
+                
+                return True
+            else:
+                print("输入的人脸图片格式不正确，应为 numpy.ndarray 类型")
+                return False
+        except Exception as e:
+            print(f"注册用户到数据库失败: {e}")
+            return False
 
     def load_user_faces_database(self):
         """从数据库加载用户人脸图片并现场提取特征"""
-        query = "SELECT username, face_image FROM user_faces"
-        results = self.execute_query(query)
-        for username, image_data in results:
-            decrypted_data = decrypt_data(image_data, self.aes_key)
-            if decrypted_data:
-                try:
-                    base64_image = decrypted_data
-                    img_bytes = base64.b64decode(base64_image)
-                    nparr = np.frombuffer(img_bytes, np.uint8)
-                    face_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                    features = self.extract_features(face_image)
-                    if features is not None:
-                        self.user_feature_db[username] = {"features": features, "timestamp": datetime.now()}
-                except Exception as e:
-                    print(f"加载用户 {username} 的人脸图片并提取特征失败: {e}")
+        try:
+            query = "SELECT username, face_image FROM user_faces"
+            results = self.execute_query(query)
+            if results:
+                for username, image_data in results:
+                    try:
+                        decrypted_data = decrypt_data(image_data, self.aes_key)
+                        if decrypted_data:
+                            base64_image = decrypted_data
+                            img_bytes = base64.b64decode(base64_image)
+                            nparr = np.frombuffer(img_bytes, np.uint8)
+                            face_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                            features = self.extract_features(face_image)
+                            if features is not None:
+                                self.user_feature_db[username] = {"features": features, "timestamp": datetime.now()}
+                    except Exception as e:
+                        print(f"加载用户 {username} 的人脸图片并提取特征失败: {e}")
+            else:
+                print("数据库中没有找到用户人脸数据")
+        except Exception as e:
+            print(f"加载用户人脸数据库失败: {e}")
 
     def record_unauthorized_user_database(self, face_image):
         """记录未授权用户"""
@@ -175,6 +192,50 @@ class FaceVerificationSystem:
         """记录恶意攻击"""
         query = "INSERT INTO malicious_attacks (attack_info) VALUES (%s)"
         self.execute_query(query, (attack_info,))
+
+    def check_username_exists(self, username):
+        """检查用户名是否已存在"""
+        try:
+            print(f"正在检查用户名: {username}")
+            query = "SELECT COUNT(*) FROM user_faces WHERE username = %s"
+            result = self.execute_query(query, (username,))
+            print(f"数据库查询结果: {result}")
+            if result and len(result) > 0:
+                count = result[0][0]
+                print(f"用户名 {username} 的计数: {count}")
+                return count > 0
+            return False
+        except Exception as e:
+            print(f"检查用户名失败: {e}")
+            return False
+
+    def check_face_exists(self, face_image):
+        """检查人脸是否已存在（通过特征对比）"""
+        try:
+            print("正在检查人脸是否已存在...")
+            features = self.extract_features(face_image)
+            if features is None:
+                print("无法提取人脸特征")
+                return False
+
+            # 对比特征库
+            if self.user_feature_db and len(self.user_feature_db) > 0:
+                print(f"当前用户库中有 {len(self.user_feature_db)} 个用户")
+                known_encodings = [data["features"] for data in self.user_feature_db.values() if data.get("features") is not None]
+                if known_encodings:
+                    face_distances = face_distance(known_encodings, features)
+                    # 如果最小距离小于阈值，说明人脸已存在
+                    min_distance = np.min(face_distances) if len(face_distances) > 0 else float('inf')
+                    print(f"最小距离: {min_distance}, 阈值: {self.feature_threshold}")
+                    result = min_distance < self.feature_threshold
+                    print(f"人脸已存在: {result}")
+                    return result
+            else:
+                print("用户库为空")
+            return False
+        except Exception as e:
+            print(f"检查人脸失败: {e}")
+            return False
 
     def load_user_faces_local(self):
         if os.path.exists("user_faces"):
@@ -267,13 +328,17 @@ class FaceVerificationSystem:
 
     def detect_face(self, image):
         """使用YOLO检测人脸并返回人脸区域"""
-        results = self.model(image, classes=[0])  # 假设0为face类别
-        if results[0].boxes:
-            # 取第一个检测到的人脸（可扩展多人脸处理）
-            box = results[0].boxes.xyxy[0].cpu().numpy().astype(int)
-            face_region = image[box[1]:box[3], box[0]:box[2]]
-            return face_region, box
-        return None, None
+        try:
+            results = self.model(image, classes=[0])  # 假设0为face类别
+            if results and len(results) > 0 and results[0] and hasattr(results[0], 'boxes') and results[0].boxes:
+                # 取第一个检测到的人脸（可扩展多人脸处理）
+                box = results[0].boxes.xyxy[0].cpu().numpy().astype(int)
+                face_region = image[box[1]:box[3], box[0]:box[2]]
+                return face_region, box
+            return None, None
+        except Exception as e:
+            print(f"人脸检测出错: {e}")
+            return None, None
 
     def extract_features(self, face_image):
         if face_image is None:
@@ -354,26 +419,31 @@ class FaceVerificationSystem:
         best_match = None
         min_distance = float('inf')
 
-        if self.user_feature_db:
-            known_encodings = [data["features"] for data in self.user_feature_db.values()]
-            face_distances = face_distance(known_encodings, features)
+        if self.user_feature_db and len(self.user_feature_db) > 0:
+            try:
+                known_encodings = [data["features"] for data in self.user_feature_db.values() if data.get("features") is not None]
+                if known_encodings:
+                    face_distances = face_distance(known_encodings, features)
 
-            # 找到最小距离及其索引
-            if len(face_distances) > 0:
-                best_match_index = np.argmin(face_distances)
-                min_distance = face_distances[best_match_index]  # 更新最小距离
+                    # 找到最小距离及其索引
+                    if len(face_distances) > 0:
+                        best_match_index = np.argmin(face_distances)
+                        min_distance = face_distances[best_match_index]  # 更新最小距离
 
-                # 使用 face_recognition 的 compare_faces 判断是否匹配
-                matches = compare_faces(known_encodings, features, tolerance=0.6)
-                if matches[best_match_index]:
-                    best_match = list(self.user_feature_db.keys())[best_match_index]
+                        # 使用 face_recognition 的 compare_faces 判断是否匹配
+                        matches = compare_faces(known_encodings, features, tolerance=0.5)
+                        if matches[best_match_index]:
+                            best_match = list(self.user_feature_db.keys())[best_match_index]
+            except Exception as e:
+                print(f"特征对比出错: {e}")
+                return {"status": "failure", "exception": f"特征对比失败: {str(e)}"}
 
         print(f"最小距离: {min_distance}, 阈值: {self.feature_threshold}")  # 新增
         # 分类逻辑
         if best_match and min_distance < self.feature_threshold:
-            return {"status" : "success", "best_match" : best_match}
+            return {"status" : "success", "best_match" : best_match, "min_distance": float(min_distance)}
         elif len(self.user_feature_db) > 0:
-            return {"status" : "failure", "exception" : "Not a Registered User"}
+            return {"status" : "failure", "exception" : "Not a Registered User", "min_distance": float(min_distance) if min_distance != float('inf') else None}
         else:
             return {"status" : "failure", "exception" : "Not a Registered User"}
 
