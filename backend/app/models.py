@@ -122,3 +122,14 @@ class GPSRecord(SQLModel, table=True):
     head: float                           # 方向角
     speed: float                          # 车辆速度（m/s）
     tflag: int                            # 车辆状态（1为载客，0为空载）
+
+
+class TaxiOrder(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    commaddr: str = Field(max_length=64)  # 车辆标识（车牌号）
+    onutc: str = Field(max_length=32)    # 上车时间戳（UTC时间类型）
+    onlat: float                          # 上车点纬度坐标
+    onlon: float                          # 上车点经度坐标
+    offutc: str = Field(max_length=32)   # 下车时间戳（UTC时间类型）
+    offlat: float                         # 下车点纬度坐标
+    offlon: float                         # 下车点经度坐标

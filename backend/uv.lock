@@ -115,7 +115,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.4,<4.0.0" },
     { name = "numpy", specifier = ">=1.24.0,<2.0.0" },
     { name = "opencv-contrib-python", specifier = ">=4.11.0.86" },
-    { name = "opencv-python", specifier = ">=4.11.0.86" },
+    { name = "opencv-python", specifier = ">=4.8.0,<5.0.0" },
     { name = "pandas", specifier = ">=2.0.0,<3.0.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4,<2.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1.13,<4.0.0" },
@@ -130,7 +130,7 @@ requires-dist = [
     { name = "sqlmodel", specifier = ">=0.0.21,<1.0.0" },
     { name = "sympy", specifier = ">=1.14.0" },
     { name = "tenacity", specifier = ">=8.2.3,<9.0.0" },
-    { name = "ultralytics", specifier = ">=8.3.163" },
+    { name = "ultralytics", specifier = ">=8.3.163,<9.0.0" },
 ]
 
 [package.metadata.requires-dev]
