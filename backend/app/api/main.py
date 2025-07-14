@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 
-from app.api.routes import items, login, private, users, utils, data_analysis,facerecognition,yolo_predict
+from app.api.routes import items, login, private, users, utils, data_analysis,facerecognition,yolo_predict,yolo_video
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -11,6 +11,7 @@ api_router.include_router(utils.router)
 api_router.include_router(items.router)
 api_router.include_router(data_analysis.router)
 api_router.include_router(yolo_predict.router)
+api_router.include_router(yolo_video.router)
 api_router.include_router(facerecognition.router)
 
 
