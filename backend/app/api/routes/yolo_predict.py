@@ -8,7 +8,7 @@ from ultralytics import YOLO
 router = APIRouter(prefix="/yolo", tags=["yolo_predict"])
 
 # 默认模型路径，可根据实际情况修改
-MODEL_PATH = os.getenv("YOLOV8N_MODEL_PATH", "app/models/road_defect/last.pt")
+MODEL_PATH = os.getenv("YOLOV8N_MODEL_PATH", "app/models/road_defect/best.pt")
 
 @router.post("/predict-image")
 def predict_image(file: UploadFile = File(...)):
