@@ -10,7 +10,7 @@ import csv
 from typing import Literal
 from sqlmodel import Session, select
 from app.core.db import engine
-from app.models import GPSRecord
+from app.models import GPSRecord, TaxiOrder
 import math
 from typing import List, Tuple, Optional
 from fastapi.responses import FileResponse
@@ -22,40 +22,25 @@ def parse_utc_timestamp(utc_str: str) -> datetime:
     return datetime.strptime(utc_str, "%Y%m%d%H%M%S")
 
 def get_time_range_data(start_utc: str, minutes: int = 15) -> list:
-    """获取指定时间戳后minutes分钟内的数据"""
-    csv_path = Path("/app/data/csv/pair_converted_jn0912.csv")
-    if not csv_path.exists():
-        return []
-    
+    """从数据库TaxiOrder表获取指定时间戳后minutes分钟内的数据"""
+    from app.models import TaxiOrder
     start_time = parse_utc_timestamp(start_utc)
     end_time = start_time + timedelta(minutes=minutes)
-    
+    start_utc_str = start_time.strftime("%Y%m%d%H%M%S")
+    end_utc_str = end_time.strftime("%Y%m%d%H%M%S")
     results = []
-    with open(csv_path, encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            utc = row.get("ONUTC", "")
-            if utc:
-                try:
-                    row_time = parse_utc_timestamp(utc)
-                    if start_time <= row_time <= end_time:
-                        # 提取经纬度
-                        lat = row.get("ONLAT")
-                        lng = row.get("ONLON")
-                        if lat and lng:
-                            try:
-                                lat_float = float(lat)
-                                lng_float = float(lng)
-                                results.append({
-                                    "lat": lat_float,
-                                    "lng": lng_float,
-                                    "utc": utc
-                                })
-                            except ValueError:
-                                continue
-                except ValueError:
-                    continue
-    
+    with Session(engine) as session:
+        query = select(TaxiOrder).where(
+            TaxiOrder.onutc >= start_utc_str,
+            TaxiOrder.onutc <= end_utc_str
+        )
+        records = session.exec(query).all()
+        for row in records:
+            results.append({
+                "lat": row.onlat,
+                "lng": row.onlon,
+                "utc": row.onutc
+            })
     return results
 
 @router.get("/dbscan-clustering")
@@ -149,36 +134,22 @@ def dbscan_clustering(
             content={"error": f"聚类分析失败: {str(e)}"}
         )
 
-@router.get("/test-data")
-def test_data_analysis():
-    """测试接口，返回一些示例数据用于调试"""
-    test_utc = "20130912011417"
-    data = get_time_range_data(test_utc, 15)
-    
-    return {
-        "test_utc": test_utc,
-        "data_points_found": len(data),
-        "sample_data": data[:5] if data else []
-    } 
 
 @router.get("/passenger-count-distribution")
 def passenger_count_distribution(
     interval: Literal["15min", "1h"] = Query("15min", description="统计间隔，可选15min或1h")
 ):
     """
-    统计全量数据，按15分钟或1小时为间隔，统计每个时间段的乘客数量分布
+    统计全量数据，按15分钟或1小时为间隔，统计每个时间段的乘客数量分布（从数据库TaxiOrder表获取）
     """
-    csv_path = Path("/app/data/csv/pair_converted_jn0912.csv")
-    if not csv_path.exists():
-        return JSONResponse(status_code=404, content={"error": "数据文件不存在"})
-    # 设定时间间隔
+    from app.models import TaxiOrder
     delta = timedelta(minutes=15) if interval == "15min" else timedelta(hours=1)
-    # 读取所有UTC时间
     time_counts = {}
-    with open(csv_path, encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            utc = row.get("ONUTC", "")
+    with Session(engine) as session:
+        # 只查 onutc 字段，减少内存消耗
+        records = session.exec(select(TaxiOrder.onutc)).all()
+        for onutc in records:
+            utc = onutc[0] if isinstance(onutc, tuple) else onutc
             if not utc:
                 continue
             try:
@@ -202,7 +173,7 @@ def passenger_count_distribution(
             "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
             "count": time_counts[k]
         })
-    return result 
+    return result
 
 @router.post("/import-gps-data")
 def import_gps_data():
@@ -520,3 +491,72 @@ def get_jinan_geojson():
     if not geojson_path.exists():
         return JSONResponse(status_code=404, content={"error": "济南市geojson文件不存在"})
     return FileResponse(str(geojson_path), media_type="application/json") 
+
+@router.post("/import-taxi-orders")
+def import_taxi_orders():
+    """
+    从CSV文件导入所有出租车订单数据到TaxiOrder表
+    """
+    filepath = "/app/data/csv/pair_converted_jn0912.csv"
+    batch_size = 1000
+    total = 0
+    try:
+        with Session(engine) as session:
+            with open(filepath, encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                batch = []
+                for row in reader:
+                    # 检查必要字段是否存在
+                    commaddr = row.get("COMMADDR", "")
+                    onutc = row.get("ONUTC", "")
+                    onlat = row.get("ONLAT", "")
+                    onlon = row.get("ONLON", "")
+                    offutc = row.get("OFFUTC", "")
+                    offlat = row.get("OFFLAT", "")
+                    offlon = row.get("OFFLON", "")
+                    # 验证必要字段不为空
+                    if not all([commaddr, onutc, onlat, onlon, offutc, offlat, offlon]):
+                        continue
+                    try:
+                        # 转换坐标字段为浮点数
+                        onlat_float = float(onlat)
+                        onlon_float = float(onlon)
+                        offlat_float = float(offlat)
+                        offlon_float = float(offlon)
+                        record = TaxiOrder(
+                            commaddr=commaddr,
+                            onutc=onutc,
+                            onlat=onlat_float,
+                            onlon=onlon_float,
+                            offutc=offutc,
+                            offlat=offlat_float,
+                            offlon=offlon_float
+                        )
+                        batch.append(record)
+                        if len(batch) >= batch_size:
+                            session.add_all(batch)
+                            session.commit()
+                            total += len(batch)
+                            batch.clear()
+                    except (ValueError, TypeError) as e:
+                        print(f"跳过无效数据行: {e}")
+                        continue
+                # 导入最后一批
+                if batch:
+                    session.add_all(batch)
+                    session.commit()
+                    total += len(batch)
+        return {
+            "message": f"成功导入{total}条出租车订单数据",
+            "imported_count": total
+        }
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"文件 {filepath} 不存在"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"导入失败: {str(e)}"}
+        ) 
