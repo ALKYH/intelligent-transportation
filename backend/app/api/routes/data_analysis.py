@@ -134,17 +134,6 @@ def dbscan_clustering(
             content={"error": f"聚类分析失败: {str(e)}"}
         )
 
-@router.get("/test-data")
-def test_data_analysis():
-    """测试接口，返回一些示例数据用于调试"""
-    test_utc = "20130912011417"
-    data = get_time_range_data(test_utc, 15)
-    
-    return {
-        "test_utc": test_utc,
-        "data_points_found": len(data),
-        "sample_data": data[:5] if data else []
-    } 
 
 @router.get("/passenger-count-distribution")
 def passenger_count_distribution(
