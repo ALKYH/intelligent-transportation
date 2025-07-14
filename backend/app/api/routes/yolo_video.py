@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 from datetime import datetime
 from ultralytics import YOLO
+import base64
 
 router = APIRouter(prefix="/yolo-video", tags=["yolo_video"])
 
@@ -98,6 +99,10 @@ def detect_frames(frames_dir, model):
         for i, frame_file in enumerate(frame_files):
             frame_path = os.path.join(frames_dir, frame_file)
             
+            # 读取图片为base64
+            with open(frame_path, "rb") as f:
+                img_base64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+            
             # 运行检测
             detection_results = model.predict(
                 source=frame_path,
@@ -136,7 +141,7 @@ def detect_frames(frames_dir, model):
                     
                     # 记录有检测结果的帧
                     results.append({
-                        'frame_file': frame_file,
+                        'frame_file': img_base64,
                         'frame_index': i,
                         'class_counts': class_counts,
                         'total_detections': len(result.boxes),

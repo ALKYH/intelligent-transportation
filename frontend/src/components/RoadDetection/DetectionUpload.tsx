@@ -31,6 +31,69 @@ interface VideoDetectionResult {
 
 const API_URL = "http://localhost:8000/api/v1";
 
+// 帧图片+标注框组件
+interface FrameWithBoxesProps {
+  src: string;
+  detections: Array<{ bbox: number[]; class_name?: string; class_id?: number }>;
+}
+function FrameWithBoxes({ src, detections }: FrameWithBoxesProps) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [imgSize, setImgSize] = useState({ width: 0, height: 0, naturalWidth: 0, naturalHeight: 0 });
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    function updateSize() {
+      setImgSize({ width: img.width, height: img.height, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
+    }
+    if (img.complete) {
+      updateSize();
+    } else {
+      img.onload = updateSize;
+    }
+  }, [src]);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    detections?.forEach(det => {
+      const [x1, y1, x2, y2] = det.bbox;
+      const scaleX = img.width / (img.naturalWidth || 1);
+      const scaleY = img.height / (img.naturalHeight || 1);
+      ctx.strokeStyle = "#e53e3e";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
+      ctx.font = "14px Arial";
+      ctx.fillStyle = "#e53e3e";
+      ctx.fillText(det.class_name ?? String(det.class_id ?? ''), x1 * scaleX + 2, y1 * scaleY + 16);
+    });
+  }, [src, detections, imgSize]);
+
+  return (
+    <Box position="relative" display="inline-block">
+      <Image ref={imgRef} src={src} alt="帧图片" maxW="120px" maxH="120px" />
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          pointerEvents: "none",
+          width: imgSize.width,
+          height: imgSize.height,
+        }}
+      />
+    </Box>
+  );
+}
+
 export default function DetectionUpload() {
   const [activeTab, setActiveTab] = useState("image");
   
@@ -356,16 +419,21 @@ export default function DetectionUpload() {
                       <Text fontWeight="bold" mb={2}>检测详情:</Text>
                       <Box maxH="300px" overflowY="auto">
                         {videoResult.frame_results.map((frame, idx) => (
-                          <Box key={idx} p={2} borderWidth={1} borderRadius="md" mb={2}>
-                            <Text fontWeight="semibold">帧 {frame.frame_index + 1}: {frame.frame_file}</Text>
-                            <Text fontSize="sm" color="gray.600">检测到 {frame.total_detections} 个病害</Text>
-                            <Stack direction="row" gap={2} mt={1} wrap="wrap">
-                              {Object.entries(frame.class_counts).map(([className, count]) => (
-                                <Badge key={className} size="sm" colorScheme="red">
-                                  {className}: {count}
-                                </Badge>
-                              ))}
-                            </Stack>
+                          <Box key={idx} p={2} borderWidth={1} borderRadius="md" mb={2} display="flex" alignItems="flex-start" gap={4}>
+                            {/* 用新组件显示带标注框的帧图片 */}
+                            <FrameWithBoxes src={frame.frame_file} detections={frame.detections} />
+                            {/* 检测结果信息 */}
+                            <Box flex={1} minW={0}>
+                              <Text fontWeight="semibold">帧 {frame.frame_index + 1}</Text>
+                              <Text fontSize="sm" color="gray.600">检测到 {frame.total_detections} 个病害</Text>
+                              <Stack direction="row" gap={2} mt={1} wrap="wrap">
+                                {Object.entries(frame.class_counts).map(([className, count]) => (
+                                  <Badge key={className} size="sm" colorScheme="red">
+                                    {className}: {count}
+                                  </Badge>
+                                ))}
+                              </Stack>
+                            </Box>
                           </Box>
                         ))}
                       </Box>
