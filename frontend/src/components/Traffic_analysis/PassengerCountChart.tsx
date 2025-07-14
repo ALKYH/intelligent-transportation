@@ -30,7 +30,7 @@ export default function PassengerCountChart() {
   }, [interval])
 
   useEffect(() => {
-    fetch('/370100_full.json')
+    fetch('/assets/jsons/370100_full.json')
       .then(res => res.json())
       .then(geoJson => {
         // 注册地图

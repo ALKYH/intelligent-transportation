@@ -482,15 +482,6 @@ def get_gps_records_corrected(
     except Exception as e:
         return {"error": str(e)} 
 
-@router.get("/jinan-geojson")
-def get_jinan_geojson():
-    """
-    返回济南市geojson地图数据
-    """
-    geojson_path = Path("app/data/json/370100_full.json")
-    if not geojson_path.exists():
-        return JSONResponse(status_code=404, content={"error": "济南市geojson文件不存在"})
-    return FileResponse(str(geojson_path), media_type="application/json") 
 
 @router.post("/import-taxi-orders")
 def import_taxi_orders():
