@@ -128,13 +128,7 @@ def detect_frames(frames_dir, model):
                         conf = float(box.conf.item())
                         xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
                         area = (xyxy[2] - xyxy[0]) * (xyxy[3] - xyxy[1])
-                        
                         class_name = CLASS_NAMES.get(cls_id, f"未知类别({cls_id})")
-                        
-                        if class_name not in class_counts:
-                            class_counts[class_name] = 0
-                        class_counts[class_name] += 1
-                        
                         detections.append({
                             "class_id": cls_id,
                             "class_name": class_name,
@@ -205,11 +199,11 @@ def predict_video(file: UploadFile = File(...), fps: int = 1):
                     all_class_counts[class_name] += count
             
             # === 插入数据库 ===
-            # 只存结构化检测结果，不存base64图片
-            db_detection_results = copy.deepcopy(detection_results)
-            for frame in db_detection_results:
-                if 'frame_file' in frame:
-                    del frame['frame_file']
+            # 扁平化所有帧的 detections，disease_info 只保存所有被检测到的病害
+            db_detection_results = []
+            for frame in detection_results:
+                for det in frame.get('detections', []):
+                    db_detection_results.append(det)
             with open(video_path, "rb") as f:
                 file_data = f.read()
             file_type = os.path.splitext(video_path)[-1].lower().replace('.', '')
@@ -217,16 +211,7 @@ def predict_video(file: UploadFile = File(...), fps: int = 1):
                 detection = RoadSurfaceDetection(
                     file_data=file_data,
                     file_type=file_type,
-                    disease_info={
-                        "video_info": {
-                            "total_frames": total_frames,
-                            "frames_with_defects": frames_with_defects,
-                            "total_detections": total_detections,
-                            "extraction_fps": fps
-                        },
-                        "class_statistics": all_class_counts,
-                        "frame_results": db_detection_results
-                    },
+                    disease_info=db_detection_results,  # 只存所有病害结构化对象
                     alarm_status=False
                 )
                 session.add(detection)

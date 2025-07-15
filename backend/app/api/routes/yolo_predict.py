@@ -109,18 +109,16 @@ def predict_images(files: List[UploadFile] = File(...)):
                         conf = float(box.conf[0])
                         xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
                         class_name = CLASS_NAMES.get(cls_id, f"未知类别({cls_id})")
-                        class_name_en = CLASS_NAMES_EN.get(cls_id, str(cls_id))
                         parsed.append({
                             "class_id": cls_id,
                             "class_name": class_name,
-                            "class_name_en": class_name_en,
                             "confidence": conf,
                             "bbox": xyxy
                         })
                         # 画框
                         x1, y1, x2, y2 = map(int, xyxy)
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0,0,255), 2)
-                        label = class_name_en
+                        label = str(cls_id)  # 只用数字做标注
                         cv2.putText(img, label, (x1, y1+16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
                 # 转base64
                 _, buffer = cv2.imencode('.jpg', img)
@@ -139,7 +137,7 @@ def predict_images(files: List[UploadFile] = File(...)):
                     detection = RoadSurfaceDetection(
                         file_data=file_data,
                         file_type=file_type,
-                        disease_info={"results": parsed},
+                        disease_info=parsed,  # 直接存list，不加results键
                         alarm_status=False
                     )
                     session.add(detection)

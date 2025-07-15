@@ -5,6 +5,7 @@ from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import Column, LargeBinary
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
+from typing import Any
 
 
 # Shared properties
@@ -142,6 +143,6 @@ class RoadSurfaceDetection(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     file_data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     file_type: str = Field(nullable=False, max_length=10)
-    disease_info: dict = Field(sa_column=Column(JSONB, nullable=False))
+    disease_info: Any = Field(sa_column=Column(JSONB, nullable=False))
     detection_time: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     alarm_status: bool = Field(default=False, nullable=False)
