@@ -12,6 +12,7 @@ export default function VehicleTrajectory() {
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
   const polylineRef = useRef<any>(null)
+  const [showPickupDropoff, setShowPickupDropoff] = useState(true)
   
   // 强制使用BD09坐标系转换
   const coordinateSystem = "BD09"
@@ -123,24 +124,60 @@ export default function VehicleTrajectory() {
     console.log('第一条数据:', data[0])
     console.log('最后一条数据:', data[data.length - 1])
 
-    // 创建轨迹点数组
-    const points = data.map(record => {
-      const point = new window.BMap.Point(record.lon, record.lat)
-      console.log(`创建点: (${record.lon}, ${record.lat})`)
-      return point
+    // 按 tflag 连续性拆分为多段
+    const segments = []
+    let currentSegment = []
+    let currentFlag = data[0].tflag
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].tflag === currentFlag) {
+        currentSegment.push(data[i])
+      } else {
+        if (currentSegment.length > 1) segments.push({ tflag: currentFlag, points: [...currentSegment] })
+        currentSegment = [data[i]]
+        currentFlag = data[i].tflag
+      }
+    }
+    if (currentSegment.length > 1) segments.push({ tflag: currentFlag, points: [...currentSegment] })
+
+    // 绘制每段
+    segments.forEach(seg => {
+      const points = seg.points.map(record => new window.BMap.Point(record.lon, record.lat))
+      const color = seg.tflag === 1 ? "#FF0000" : "#0066FF" // 载客红，空载蓝
+      const polyline = new window.BMap.Polyline(points, {
+        strokeColor: color,
+        strokeWeight: 3,
+        strokeOpacity: 0.8
+      })
+      mapInstanceRef.current.addOverlay(polyline)
+
+      // 只在每段最后一个点标注（受 showPickupDropoff 控制）
+      if (showPickupDropoff) {
+        const lastPoint = points[points.length - 1]
+        if (seg.tflag === 1) {
+          // 载客段，最后一个点为下客点
+          const dropoffIcon = new window.BMap.Icon(
+            'https://api.iconify.design/mdi:map-marker-check.svg?color=%2300bb00',
+            new window.BMap.Size(32, 32),
+            { anchor: new window.BMap.Size(16, 32) }
+          )
+          const marker = new window.BMap.Marker(lastPoint, { icon: dropoffIcon })
+          marker.setLabel(new window.BMap.Label('下客点', { offset: new window.BMap.Size(20, -10) }))
+          mapInstanceRef.current.addOverlay(marker)
+          markersRef.current.push(marker)
+        } else {
+          // 空载段，最后一个点为上客点
+          const pickupIcon = new window.BMap.Icon(
+            'https://api.iconify.design/mdi:map-marker-plus.svg?color=%23ff9900',
+            new window.BMap.Size(32, 32),
+            { anchor: new window.BMap.Size(16, 32) }
+          )
+          const marker = new window.BMap.Marker(lastPoint, { icon: pickupIcon })
+          marker.setLabel(new window.BMap.Label('上客点', { offset: new window.BMap.Size(20, -10) }))
+          mapInstanceRef.current.addOverlay(marker)
+          markersRef.current.push(marker)
+        }
+      }
     })
-    
-    console.log('轨迹点数量:', points.length)
-    
-    // 绘制轨迹线
-    const polyline = new window.BMap.Polyline(points, {
-      strokeColor: "#FF0000",
-      strokeWeight: 3,
-      strokeOpacity: 0.8
-    })
-    mapInstanceRef.current.addOverlay(polyline)
-    polylineRef.current = polyline
-    console.log('轨迹线已添加')
 
     // 添加起点和终点标记
     if (data.length > 0) {
@@ -179,7 +216,8 @@ export default function VehicleTrajectory() {
     }
 
     // 调整地图视野以包含所有轨迹点
-    mapInstanceRef.current.setViewport(points)
+    const allPoints = data.map(record => new window.BMap.Point(record.lon, record.lat))
+    mapInstanceRef.current.setViewport(allPoints)
     console.log('地图视野已调整')
   }
 
@@ -281,6 +319,14 @@ export default function VehicleTrajectory() {
               w={52}
             />
           </Field>
+          <Field label="显示上下客点">
+            <input
+              type="checkbox"
+              checked={showPickupDropoff}
+              onChange={e => setShowPickupDropoff(e.target.checked)}
+              style={{ width: 18, height: 18 }}
+            />
+          </Field>
         </HStack>
         
         {/* 坐标系说明 */}
@@ -324,6 +370,18 @@ export default function VehicleTrajectory() {
       />
 
       {/* 轨迹数据展示 */}
+      {/* 图例说明 */}
+      <Box mt={4} mb={2} display="flex" alignItems="center" gap={6}>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Box w="20px" h="6px" bg="#FF0000" borderRadius="sm" border="1px solid #aaa" />
+          <Text fontSize="sm">载客</Text>
+        </Box>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Box w="20px" h="6px" bg="#0066FF" borderRadius="sm" border="1px solid #aaa" />
+          <Text fontSize="sm">空载</Text>
+        </Box>
+      </Box>
+
       {trajectoryData.length > 0 && (
         <Box>
           <Text fontWeight="bold" mb={2}>
