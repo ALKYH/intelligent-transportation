@@ -10,6 +10,10 @@ import shutil
 from datetime import datetime
 from ultralytics import YOLO
 import base64
+from app.models import RoadSurfaceDetection
+from sqlmodel import Session
+from app.core.db import engine
+import copy
 
 router = APIRouter(prefix="/yolo-video", tags=["yolo_video"])
 
@@ -199,6 +203,34 @@ def predict_video(file: UploadFile = File(...), fps: int = 1):
                     if class_name not in all_class_counts:
                         all_class_counts[class_name] = 0
                     all_class_counts[class_name] += count
+            
+            # === 插入数据库 ===
+            # 只存结构化检测结果，不存base64图片
+            db_detection_results = copy.deepcopy(detection_results)
+            for frame in db_detection_results:
+                if 'frame_file' in frame:
+                    del frame['frame_file']
+            with open(video_path, "rb") as f:
+                file_data = f.read()
+            file_type = os.path.splitext(video_path)[-1].lower().replace('.', '')
+            with Session(engine) as session:
+                detection = RoadSurfaceDetection(
+                    file_data=file_data,
+                    file_type=file_type,
+                    disease_info={
+                        "video_info": {
+                            "total_frames": total_frames,
+                            "frames_with_defects": frames_with_defects,
+                            "total_detections": total_detections,
+                            "extraction_fps": fps
+                        },
+                        "class_statistics": all_class_counts,
+                        "frame_results": db_detection_results
+                    },
+                    alarm_status=False
+                )
+                session.add(detection)
+                session.commit()
             
             return {
                 "video_info": {

@@ -7,6 +7,9 @@ from ultralytics import YOLO
 from typing import List
 import cv2
 import base64
+from app.models import RoadSurfaceDetection
+from sqlmodel import Session
+from app.core.db import engine
 
 router = APIRouter(prefix="/yolo", tags=["yolo_predict"])
 
@@ -128,6 +131,19 @@ def predict_images(files: List[UploadFile] = File(...)):
                     "results": parsed,
                     "annotated_image_base64": img_base64
                 })
+                # === 插入数据库 ===
+                with open(img_path, "rb") as f:
+                    file_data = f.read()
+                file_type = os.path.splitext(filename)[-1].lower().replace('.', '')
+                with Session(engine) as session:
+                    detection = RoadSurfaceDetection(
+                        file_data=file_data,
+                        file_type=file_type,
+                        disease_info={"results": parsed},
+                        alarm_status=False
+                    )
+                    session.add(detection)
+                    session.commit()
         return {"results": results_list}
     except Exception as e:
         print("批量检测异常:", str(e))
