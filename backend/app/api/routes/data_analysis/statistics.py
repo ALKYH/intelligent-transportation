@@ -15,37 +15,49 @@ router = APIRouter(prefix="/analysis", tags=["analysis-statistics"])
 
 @router.get("/passenger-count-distribution")
 def passenger_count_distribution(
-    interval: Literal["15min", "1h"] = Query("15min", description="统计间隔，可选15min或1h")
+    interval: Literal["15min", "1h"] = Query("15min", description="统计间隔，可选15min或1h"),
+    date: str = Query(None, description="指定日期，格式为YYYYMMDD")
 ):
-    from app.models import TaxiOrder
-    delta = timedelta(minutes=15) if interval == "15min" else timedelta(hours=1)
-    time_counts = {}
-    with Session(engine) as session:
-        records = session.exec(select(TaxiOrder.onutc)).all()
-        for onutc in records:
-            utc = onutc[0] if isinstance(onutc, tuple) else onutc
-            if not utc:
-                continue
-            try:
-                dt = parse_utc_timestamp(utc)
-                if interval == "15min":
-                    bucket = dt.replace(minute=(dt.minute // 15) * 15, second=0)
-                else:
-                    bucket = dt.replace(minute=0, second=0)
-                key = bucket.strftime("%Y%m%d%H%M%S")
-                time_counts[key] = time_counts.get(key, 0) + 1
-            except Exception:
-                continue
+    """
+    用SQL分桶统计每个时间段的订单数（乘客数），大幅提升查询速度。
+    """
+    if interval == "15min":
+        bucket_sql = (
+            "SUBSTRING(onutc, 1, 8) || SUBSTRING(onutc, 9, 2) || "
+            "LPAD((FLOOR(CAST(SUBSTRING(onutc, 11, 2) AS INTEGER) / 15) * 15)::text, 2, '0') || '00'"
+        )
+        delta = timedelta(minutes=15)
+    else:
+        bucket_sql = "SUBSTRING(onutc, 1, 8) || SUBSTRING(onutc, 9, 2) || '0000'"
+        delta = timedelta(hours=1)
+    where_clause = "WHERE onutc IS NOT NULL"
+    params = {}
+    if date:
+        where_clause += " AND SUBSTRING(onutc, 1, 8) = :date"
+        params["date"] = date
+    sql = text(f"""
+        SELECT {bucket_sql} AS interval_start, COUNT(*) AS count
+        FROM taxiorder
+        {where_clause}
+        GROUP BY interval_start
+        ORDER BY interval_start
+    """)
     result = []
-    for k in sorted(time_counts.keys()):
-        start_dt = parse_utc_timestamp(k)
-        end_dt = start_dt + delta
-        result.append({
-            "interval_start": k,
-            "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
-            "count": time_counts[k]
-        })
-    return result
+    try:
+        with Session(engine) as session:
+            rows = session.execute(sql, params).fetchall()
+            for row in rows:
+                k = row[0]
+                start_dt = parse_utc_timestamp(k)
+                end_dt = start_dt + delta
+                result.append({
+                    "interval_start": k,
+                    "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
+                    "count": row[1]
+                })
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"统计乘客数量分布失败: {str(e)}"})
 
 @router.get("/distance-distribution")
 def distance_distribution():
@@ -113,6 +125,52 @@ def distance_distribution():
             status_code=500,
             content={"error": f"查询距离分布失败: {str(e)}"}
         )
+
+@router.get("/occupied-taxi-count-distribution")
+def occupied_taxi_count_distribution(
+    interval: Literal["15min", "1h"] = Query("15min", description="统计间隔，可选15min或1h"),
+    date: str = Query(None, description="指定日期，格式为YYYYMMDD")
+):
+    """
+    用SQL分桶统计每个时间段内有多少不同的出租车在载客。
+    """
+    if interval == "15min":
+        bucket_sql = (
+            "SUBSTRING(onutc, 1, 8) || SUBSTRING(onutc, 9, 2) || "
+            "LPAD((FLOOR(CAST(SUBSTRING(onutc, 11, 2) AS INTEGER) / 15) * 15)::text, 2, '0') || '00'"
+        )
+        delta = timedelta(minutes=15)
+    else:
+        bucket_sql = "SUBSTRING(onutc, 1, 8) || SUBSTRING(onutc, 9, 2) || '0000'"
+        delta = timedelta(hours=1)
+    where_clause = "WHERE onutc IS NOT NULL AND commaddr IS NOT NULL"
+    params = {}
+    if date:
+        where_clause += " AND SUBSTRING(onutc, 1, 8) = :date"
+        params["date"] = date
+    sql = text(f"""
+        SELECT {bucket_sql} AS interval_start, COUNT(DISTINCT commaddr) AS occupied_taxi_count
+        FROM taxiorder
+        {where_clause}
+        GROUP BY interval_start
+        ORDER BY interval_start
+    """)
+    result = []
+    try:
+        with Session(engine) as session:
+            rows = session.execute(sql, params).fetchall()
+            for row in rows:
+                k = row[0]
+                start_dt = parse_utc_timestamp(k)
+                end_dt = start_dt + delta
+                result.append({
+                    "interval_start": k,
+                    "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
+                    "occupied_taxi_count": row[1]
+                })
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"统计载客出租车数量分布失败: {str(e)}"})
 
 @router.post("/import-gps-data")
 def import_gps_data():

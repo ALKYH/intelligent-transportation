@@ -15,6 +15,12 @@ export default function PassengerDensityHeatMap() {
   // 日期时间选择器状态
   const [selectedDateTime, setSelectedDateTime] = useState("2013-09-12T01:14:17")
   const [selectedEndDateTime, setSelectedEndDateTime] = useState("2013-09-12T04:28:35")
+  // 动画相关
+  const [playing, setPlaying] = useState(false)
+  const [currentStep, setCurrentStep] = useState(0)
+  const [timeSteps, setTimeSteps] = useState<string[]>([])
+  const [currentTimeLabel, setCurrentTimeLabel] = useState<string>("")
+  const timerRef = useRef<any>(null)
 
   // 将日期时间转换为UTC时间戳
   const convertDateTimeToUtc = (dateTimeStr: string) => {
@@ -47,10 +53,37 @@ export default function PassengerDensityHeatMap() {
     setEndUtc(utcTimestamp)
   }
 
+  // 切分时间区间
+  function splitTimeRange(startUtc: string, endUtc: string, intervalMin: number = 15) {
+    const result: string[] = []
+    let cur = startUtc
+    while (cur <= endUtc) {
+      result.push(cur)
+      // 增加15分钟
+      const y = +cur.slice(0,4), m = +cur.slice(4,6)-1, d = +cur.slice(6,8)
+      const H = +cur.slice(8,10), M = +cur.slice(10,12), S = +cur.slice(12,14)
+      const date = new Date(y, m, d, H, M, S)
+      date.setMinutes(date.getMinutes() + intervalMin)
+      const next = date.getFullYear().toString().padStart(4,'0') +
+        (date.getMonth()+1).toString().padStart(2,'0') +
+        date.getDate().toString().padStart(2,'0') +
+        date.getHours().toString().padStart(2,'0') +
+        date.getMinutes().toString().padStart(2,'0') +
+        date.getSeconds().toString().padStart(2,'0')
+      cur = next
+    }
+    return result
+  }
+
   useEffect(() => {
     // 百度地图API初始化
     const initMap = () => {
-      if (typeof window !== 'undefined' && window.BMap) {
+      if (
+        typeof window !== 'undefined' &&
+        window.BMap &&
+        window.BMapLib &&
+        window.BMapLib.HeatmapOverlay
+      ) {
         const map = new window.BMap.Map(mapRef.current)
         mapInstanceRef.current = map
         // 设置济南市中心坐标
@@ -71,7 +104,6 @@ export default function PassengerDensityHeatMap() {
         })
         map.addOverlay(heatmapOverlay)
         heatmapOverlayRef.current = heatmapOverlay
-        // 初始渲染示例数据
       }
     }
     // 动态加载百度地图API
@@ -88,45 +120,86 @@ export default function PassengerDensityHeatMap() {
           heatmapScript.onload = initMap
           document.head.appendChild(heatmapScript)
         }
-      } else {
+      } else if (window.BMap && window.BMapLib && window.BMapLib.HeatmapOverlay) {
         initMap()
       }
     }
     loadBaiduMap()
+    // 清理定时器和热力图引用
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      heatmapOverlayRef.current = null
+      mapInstanceRef.current = null
+    }
   }, [])
+
+  // 动态轮播主逻辑
+  useEffect(() => {
+    if (!playing || timeSteps.length === 0) return
+    if (currentStep >= timeSteps.length) {
+      setPlaying(false)
+      setCurrentTimeLabel("")
+      return
+    }
+    const showStep = async () => {
+      const curStart = timeSteps[currentStep]
+      // 计算15分钟后的结束时间
+      const y = +curStart.slice(0,4), m = +curStart.slice(4,6)-1, d = +curStart.slice(6,8)
+      const H = +curStart.slice(8,10), M = +curStart.slice(10,12), S = +curStart.slice(12,14)
+      const date = new Date(y, m, d, H, M, S)
+      date.setMinutes(date.getMinutes() + 15)
+      const curEnd = date.getFullYear().toString().padStart(4,'0') +
+        (date.getMonth()+1).toString().padStart(2,'0') +
+        date.getDate().toString().padStart(2,'0') +
+        date.getHours().toString().padStart(2,'0') +
+        date.getMinutes().toString().padStart(2,'0') +
+        date.getSeconds().toString().padStart(2,'0')
+      setCurrentTimeLabel(`${curStart.slice(0,4)}-${curStart.slice(4,6)}-${curStart.slice(6,8)} ${curStart.slice(8,10)}:${curStart.slice(10,12)} ~ ${curEnd.slice(8,10)}:${curEnd.slice(10,12)}`)
+      try {
+        const res = await fetch(`http://localhost:8000/api/v1/analysis/dbscan-clustering?start_utc=${curStart}&eps=0.03&min_samples=3`)
+        const data = await res.json()
+        const hotSpots = data.hot_spots || []
+        const points = hotSpots.map((spot: any) => ({
+          lng: parseFloat(spot.lng),
+          lat: parseFloat(spot.lat),
+          count: parseInt(spot.count)+40
+        })).filter((p: any) => !isNaN(p.lng) && !isNaN(p.lat))
+        if (window.BMap && window.BMapLib && window.BMapLib.HeatmapOverlay && heatmapOverlayRef.current) {
+          heatmapOverlayRef.current.setDataSet({ data: [], max: 100 })
+          heatmapOverlayRef.current.setDataSet({
+            data: points,
+            max: 100
+          })
+        }
+      } catch (e) {
+        // 忽略单步错误
+      }
+      timerRef.current = setTimeout(() => {
+        setCurrentStep(s => s + 1)
+      }, 1200)
+    }
+    showStep()
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [playing, currentStep, timeSteps])
 
   const handleAnalyze = async () => {
     setAnalyzing(true)
-    try {
-      const res = await fetch(`http://localhost:8000/api/v1/analysis/dbscan-clustering?start_utc=${startUtc}&eps=0.03&min_samples=3`)
-      const data = await res.json()
-      // 使用热门上客点数据生成热力图
-      const hotSpots = data.hot_spots || []
-      const points = hotSpots.map((spot: any) => ({
-        lng: parseFloat(spot.lng),
-        lat: parseFloat(spot.lat),
-        count: parseInt(spot.count)+40
-      })).filter((p: any) => !isNaN(p.lng) && !isNaN(p.lat))
-      console.log('热门上客点数据:', points)
-      // 动态更新热力图
-      if (window.BMap && window.BMapLib && heatmapOverlayRef.current) {
-        heatmapOverlayRef.current.setDataSet({ data: [], max: 100 })
-        heatmapOverlayRef.current.setDataSet({
-          data: points,
-          max: 100
-        })
-      }
-    } catch (e) {
-      console.error('聚类分析失败:', e)
-    } finally {
-      setAnalyzing(false)
-    }
+    setPlaying(false)
+    setCurrentStep(0)
+    setCurrentTimeLabel("")
+    if (timerRef.current) clearTimeout(timerRef.current)
+    // 生成所有时间步
+    const steps = splitTimeRange(startUtc, endUtc, 15)
+    setTimeSteps(steps)
+    setPlaying(true)
+    setAnalyzing(false)
   }
 
   return (
     <Container maxW="full">
       <Heading size="md" mb={4}>上客点密度分析</Heading>
-      
       {/* 查询条件 */}
       <VStack gap={4} align="stretch" mb={6}>
         <HStack gap={4}>
@@ -144,7 +217,6 @@ export default function PassengerDensityHeatMap() {
               }}
             />
           </Field>
-          
           <Field label="结束时间">
             <input
               type="datetime-local"
@@ -160,7 +232,6 @@ export default function PassengerDensityHeatMap() {
             />
           </Field>
         </HStack>
-        
         {/* 分析参数说明 */}
         <Box border="1px solid" borderColor="gray.200" borderRadius="md" p={4}>
           <Text fontWeight="bold" mb={3}>分析参数</Text>
@@ -168,7 +239,6 @@ export default function PassengerDensityHeatMap() {
             使用DBSCAN聚类算法分析热门上客点，eps=0.03，min_samples=3
           </Text>
         </Box>
-        
         <Button
           colorScheme="blue"
           onClick={handleAnalyze}
@@ -178,7 +248,12 @@ export default function PassengerDensityHeatMap() {
           开始分析
         </Button>
       </VStack>
-
+      {/* 当前时间段显示 */}
+      {playing && currentTimeLabel && (
+        <Box mb={2} textAlign="center">
+          <Text fontWeight="bold" color="blue.600">当前时间段：{currentTimeLabel}</Text>
+        </Box>
+      )}
       {/* 地图容器 */}
       <Box 
         ref={mapRef}
@@ -189,7 +264,6 @@ export default function PassengerDensityHeatMap() {
         borderRadius="md"
         mb={4}
       />
-
       {/* 热力图说明 */}
       <Box
         bg="blue.50"

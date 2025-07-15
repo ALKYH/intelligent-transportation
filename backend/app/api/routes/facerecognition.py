@@ -47,10 +47,20 @@ def register_face(username: str = Form(...), file: UploadFile = File(...)):
         return {"status": "failure", "exception": str(e)}
 
 @router.post("/record-malicious-attack")
-def record_malicious_attack(attack_info: str = Form(...)):
+def record_malicious_attack(attack_info: str = Form(...), file: UploadFile = File(...)):
     """记录恶意攻击信息"""
     try:
-        face_system.record_malicious_attack_database(attack_info)
+        contents = file.file.read()
+        import cv2
+        import numpy as np
+        nparr = np.frombuffer(contents, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # 检测人脸区域
+        face_region, _ = face_system.detect_face(image)
+        if face_region is None:
+            return {"status": "failure", "exception": "未检测到人脸"}
+
+        face_system.record_malicious_attack_database(attack_info, face_region)
         return {"status": "success", "message": "恶意攻击信息记录成功"}
     except Exception as e:
         return {"status": "failure", "exception": str(e)}
