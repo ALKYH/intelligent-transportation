@@ -226,7 +226,7 @@ export default function DetectionUpload() {
 
         <Tabs.Content value="image">
           <Box borderWidth={1} borderRadius="lg" boxShadow="md" p={6}>
-            <Text fontSize="lg" fontWeight="bold" mb={4}>图片路面灾害检测（批量）</Text>
+            <Text fontSize="lg" fontWeight="bold" mb={4}>图片路面灾害检测</Text>
             <InputGroup>
               <input
                 type="file"
