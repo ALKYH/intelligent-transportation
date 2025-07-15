@@ -98,7 +98,7 @@ export default function PassengerDensityHeatMap() {
         map.addControl(new window.BMap.MapTypeControl())
         // 创建热力图实例并保存
         const heatmapOverlay = new window.BMapLib.HeatmapOverlay({
-          "radius": 30,
+          "radius": 25,
           "visible": true,
           "opacity": 0.6
         })
@@ -156,13 +156,13 @@ export default function PassengerDensityHeatMap() {
         date.getSeconds().toString().padStart(2,'0')
       setCurrentTimeLabel(`${curStart.slice(0,4)}-${curStart.slice(4,6)}-${curStart.slice(6,8)} ${curStart.slice(8,10)}:${curStart.slice(10,12)} ~ ${curEnd.slice(8,10)}:${curEnd.slice(10,12)}`)
       try {
-        const res = await fetch(`http://localhost:8000/api/v1/analysis/dbscan-clustering?start_utc=${curStart}&eps=0.03&min_samples=3`)
+        const res = await fetch(`http://localhost:8000/api/v1/analysis/dbscan-clustering?start_utc=${curStart}&eps=0.001&min_samples=1`)
         const data = await res.json()
         const hotSpots = data.hot_spots || []
         const points = hotSpots.map((spot: any) => ({
           lng: parseFloat(spot.lng),
           lat: parseFloat(spot.lat),
-          count: parseInt(spot.count)+40
+          count: parseInt(spot.count)+30
         })).filter((p: any) => !isNaN(p.lng) && !isNaN(p.lat))
         if (window.BMap && window.BMapLib && window.BMapLib.HeatmapOverlay && heatmapOverlayRef.current) {
           heatmapOverlayRef.current.setDataSet({ data: [], max: 100 })

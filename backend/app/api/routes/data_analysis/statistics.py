@@ -60,7 +60,9 @@ def passenger_count_distribution(
         return JSONResponse(status_code=500, content={"error": f"统计乘客数量分布失败: {str(e)}"})
 
 @router.get("/distance-distribution")
-def distance_distribution():
+def distance_distribution(
+    date: str = Query(None, description="指定日期，格式为YYYYMMDD")
+):
     """
     查询 TaxiOrder 表中不同距离运输的占比统计
     短途：< 4000米
@@ -69,17 +71,21 @@ def distance_distribution():
     """
     try:
         with Session(engine) as session:
-            # 直接用 SQL 聚合统计
+            where_clause = "WHERE distance IS NOT NULL"
+            params = {}
+            if date:
+                where_clause += " AND SUBSTRING(onutc, 1, 8) = :date"
+                params["date"] = date
             sql = text(
-                "SELECT "
+                f"SELECT "
                 "COUNT(*) AS total, "
                 "SUM(CASE WHEN distance < 4000 THEN 1 ELSE 0 END) AS short_count, "
                 "SUM(CASE WHEN distance >= 4000 AND distance <= 8000 THEN 1 ELSE 0 END) AS medium_count, "
                 "SUM(CASE WHEN distance > 8000 THEN 1 ELSE 0 END) AS long_count "
                 "FROM taxiorder "
-                "WHERE distance IS NOT NULL"
+                f"{where_clause}"
             )
-            result = session.exec(sql).first()
+            result = session.execute(sql, params).first()
             if result:
                 total_count = result[0]
                 short_distance_count = result[1]

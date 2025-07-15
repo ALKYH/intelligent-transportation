@@ -24,6 +24,9 @@ export default function PassengerCountChart() {
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapOption, setMapOption] = useState<any>(null)
   const [distanceData, setDistanceData] = useState<any>(null)
+  const [occupiedTaxiData, setOccupiedTaxiData] = useState<any[]>([])
+  const [occupiedTaxiLoading, setOccupiedTaxiLoading] = useState(false)
+  const [chartType, setChartType] = useState<'passenger' | 'taxi'>('passenger')
 
   useEffect(() => {
     setLoading(true)
@@ -41,6 +44,15 @@ export default function PassengerCountChart() {
       .then(data => setDistanceData(data.distance_distribution))
       .catch(() => setDistanceData(null))
   }, [date])
+
+  useEffect(() => {
+    setOccupiedTaxiLoading(true)
+    fetch(`http://localhost:8000/api/v1/analysis/occupied-taxi-count-distribution?interval=${interval}&date=${formatDateParam(date)}`)
+      .then(res => res.json())
+      .then(data => setOccupiedTaxiData(data))
+      .catch(() => setOccupiedTaxiData([]))
+      .finally(() => setOccupiedTaxiLoading(false))
+  }, [interval, date])
 
   useEffect(() => {
     const jinanPopulation = [
@@ -175,6 +187,34 @@ export default function PassengerCountChart() {
     ]
   } : null
 
+  // occupiedTaxiOption 需要放在组件函数体内，且依赖于 occupiedTaxiData 和 interval
+  const occupiedTaxiOption = {
+    title: { text: `${interval === '15min' ? '15分钟' : '1小时'}载客车数量分布`, left: 'center' },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      type: 'category',
+      data: occupiedTaxiData.map((item: any) => {
+        if (interval === '15min') {
+          return item.interval_start.slice(8, 10) + ':' + item.interval_start.slice(10, 12)
+        } else {
+          return item.interval_start.slice(8, 10) + ':00'
+        }
+      }),
+      name: '时间',
+      axisLabel: { rotate: 45 }
+    },
+    yAxis: { type: 'value', name: '载客车数量' },
+    series: [
+      {
+        data: occupiedTaxiData.map((item: any) => item.occupied_taxi_count),
+        type: 'line',
+        smooth: true,
+        areaStyle: {},
+        name: '载客车数'
+      }
+    ]
+  }
+
   return (
     <>
       <Flex align="center" gap={4} mb={2}>
@@ -196,12 +236,32 @@ export default function PassengerCountChart() {
             <Radio value="1h">1小时</Radio>
           </RadioGroup>
         </Field>
+        <Field label="图表类型">
+          <RadioGroup value={chartType} onValueChange={e => setChartType(e.value as 'passenger' | 'taxi')} direction="row">
+            <Radio value="passenger">乘车人数分布</Radio>
+            <Radio value="taxi">载客车辆分布</Radio>
+          </RadioGroup>
+        </Field>
       </Flex>
-      <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}乘客数量分布图：</Text>
-      {loading ? (
-        <Text mt={4}>加载中...</Text>
+      {/* 图表展示区 */}
+      {chartType === 'passenger' ? (
+        <>
+          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}乘客数量分布图：</Text>
+          {loading ? (
+            <Text mt={4}>加载中...</Text>
+          ) : (
+            <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
+          )}
+        </>
       ) : (
-        <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
+        <>
+          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}载客车辆分布图：</Text>
+          {occupiedTaxiLoading ? (
+            <Text mt={4}>加载中...</Text>
+          ) : (
+            <ReactECharts style={{height: 400}} option={occupiedTaxiOption} notMerge={true} lazyUpdate={true} />
+          )}
+        </>
       )}
       {/* 路程分析饼图展示，放在地图上方 */}
       <Text mt={8} mb={2} fontWeight="bold">路程分析：</Text>
