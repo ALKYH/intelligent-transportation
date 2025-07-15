@@ -45,7 +45,7 @@ function RecoverPassword() {
   const mutation = useMutation({
     mutationFn: recoverPassword,
     onSuccess: () => {
-      showSuccessToast("Password recovery email sent successfully.")
+      showSuccessToast("密码恢复邮件发送成功。")
       reset()
     },
     onError: (err: ApiError) => {
@@ -69,26 +69,26 @@ function RecoverPassword() {
       centerContent
     >
       <Heading size="xl" color="ui.main" textAlign="center" mb={2}>
-        Password Recovery
+        密码恢复
       </Heading>
       <Text textAlign="center">
-        A password recovery email will be sent to the registered account.
+        系统将向注册账户发送密码恢复邮件。
       </Text>
       <Field invalid={!!errors.email} errorText={errors.email?.message}>
         <InputGroup w="100%" startElement={<FiMail />}>
           <Input
             id="email"
             {...register("email", {
-              required: "Email is required",
-              pattern: emailPattern,
+              required: "邮箱为必填项",
+              pattern: { value: emailPattern, message: "邮箱格式不正确" },
             })}
-            placeholder="Email"
+            placeholder="邮箱地址"
             type="email"
           />
         </InputGroup>
       </Field>
       <Button variant="solid" type="submit" loading={isSubmitting}>
-        Continue
+        继续
       </Button>
     </Container>
   )

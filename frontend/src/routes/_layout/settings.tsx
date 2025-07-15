@@ -8,10 +8,10 @@ import UserInformation from "@/components/UserSettings/UserInformation"
 import useAuth from "@/hooks/useAuth"
 
 const tabsConfig = [
-  { value: "my-profile", title: "My profile", component: UserInformation },
-  { value: "password", title: "Password", component: ChangePassword },
-  { value: "appearance", title: "Appearance", component: Appearance },
-  { value: "danger-zone", title: "Danger zone", component: DeleteAccount },
+  { value: "my-profile", title: "个人信息", component: UserInformation },
+  { value: "password", title: "修改密码", component: ChangePassword },
+  { value: "appearance", title: "外观设置", component: Appearance },
+  { value: "danger-zone", title: "危险操作", component: DeleteAccount },
 ]
 
 export const Route = createFileRoute("/_layout/settings")({
@@ -31,7 +31,7 @@ function UserSettings() {
   return (
     <Container maxW="full">
       <Heading size="lg" textAlign={{ base: "center", md: "left" }} py={12}>
-        User Settings
+        设置
       </Heading>
 
       <Tabs.Root defaultValue="my-profile" variant="subtle">

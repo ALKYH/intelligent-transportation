@@ -23,7 +23,7 @@ const NotFound = () => {
               404
             </Text>
             <Text fontSize="2xl" fontWeight="bold" mb={2}>
-              Oops!
+              未找到页面
             </Text>
           </Flex>
         </Flex>
@@ -35,7 +35,7 @@ const NotFound = () => {
           textAlign="center"
           zIndex={1}
         >
-          The page you are looking for was not found.
+          您访问的页面不存在。
         </Text>
         <Center zIndex={1}>
           <Link to="/">
@@ -45,7 +45,7 @@ const NotFound = () => {
               mt={4}
               alignSelf="center"
             >
-              Go Back
+              返回首页
             </Button>
           </Link>
         </Center>
