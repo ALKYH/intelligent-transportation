@@ -512,9 +512,6 @@ class FaceVerificationSystem:
 
 # 示例用法
 if __name__ == "__main__":
-    # 确保用户人脸存储目录存在
-    #if not os.path.exists("user_faces"):
-    #    os.makedirs("user_faces")
 
     system = FaceVerificationSystem()
     image_path = "ljz.png"
