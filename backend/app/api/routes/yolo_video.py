@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 import os
 import tempfile
@@ -152,7 +152,7 @@ def detect_frames(frames_dir, model):
         raise Exception(f"检测过程中出错: {str(e)}")
 
 @router.post("/predict-video")
-def predict_video(file: UploadFile = File(...), fps: int = 1):
+def predict_video(file: UploadFile = File(...), fps: int = Form(1)):
     """
     接收一个视频文件，提取帧并进行路面灾害检测
     """
@@ -198,12 +198,15 @@ def predict_video(file: UploadFile = File(...), fps: int = 1):
                         all_class_counts[class_name] = 0
                     all_class_counts[class_name] += count
             
-            # === 插入数据库 ===
-            # 扁平化所有帧的 detections，disease_info 只保存所有被检测到的病害
+            # === 只存结构化病害对象 ===
             db_detection_results = []
             for frame in detection_results:
                 for det in frame.get('detections', []):
-                    db_detection_results.append(det)
+                    db_detection_results.append({
+                        "disease_type": det.get("class_name", ""),
+                        "bbox": det["bbox"],
+                        "area": det.get("area", None)
+                    })
             with open(video_path, "rb") as f:
                 file_data = f.read()
             file_type = os.path.splitext(video_path)[-1].lower().replace('.', '')
@@ -211,7 +214,7 @@ def predict_video(file: UploadFile = File(...), fps: int = 1):
                 detection = RoadSurfaceDetection(
                     file_data=file_data,
                     file_type=file_type,
-                    disease_info=db_detection_results,  # 只存所有病害结构化对象
+                    disease_info=db_detection_results,  # 只存 disease_type/area/bbox
                     alarm_status=False
                 )
                 session.add(detection)

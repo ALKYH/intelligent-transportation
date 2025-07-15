@@ -129,15 +129,23 @@ def predict_images(files: List[UploadFile] = File(...)):
                     "results": parsed,
                     "annotated_image_base64": img_base64
                 })
-                # === 插入数据库 ===
+                # 先读取原始图片二进制和文件类型
                 with open(img_path, "rb") as f:
                     file_data = f.read()
                 file_type = os.path.splitext(filename)[-1].lower().replace('.', '')
+                # === 只存结构化病害对象 ===
+                db_detection_results = []
+                for item in parsed:
+                    db_detection_results.append({
+                        "disease_type": item.get("class_name", ""),
+                        "bbox": item["bbox"],
+                        "area": item.get("area", None)
+                    })
                 with Session(engine) as session:
                     detection = RoadSurfaceDetection(
                         file_data=file_data,
                         file_type=file_type,
-                        disease_info=parsed,  # 直接存list，不加results键
+                        disease_info=db_detection_results,  # 只存 disease_type/area/bbox
                         alarm_status=False
                     )
                     session.add(detection)
