@@ -97,15 +97,12 @@ function FrameWithBoxes({ src, detections }: FrameWithBoxesProps) {
 export default function DetectionUpload() {
   const [activeTab, setActiveTab] = useState("image");
   
-  // 图片检测状态
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageResult, setImageResult] = useState<DetectionResult[] | null>(null);
+  // 替换图片检测相关状态
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageResults, setImageResults] = useState<any[]>([]); // [{filename, results, annotated_image_base64}]
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [imageSize, setImageSize] = useState<{width: number, height: number} | null>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const imageCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // 视频检测状态
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -115,34 +112,37 @@ export default function DetectionUpload() {
   const [videoError, setVideoError] = useState<string | null>(null);
   const [extractionFps, setExtractionFps] = useState(1);
 
-  // 图片处理函数
+  // 处理多图片选择
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const selectedFile = e.target.files[0];
-      setImageFile(selectedFile);
-      setImageResult(null);
+      const files = Array.from(e.target.files);
+      setImageFiles(files);
+      setImageResults([]);
       setImageError(null);
-      // 生成图片预览
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
+      // 生成所有图片预览
+      Promise.all(files.map(file => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      })).then(setImagePreviews);
     } else {
-      setImagePreview(null);
-      setImageFile(null);
+      setImagePreviews([]);
+      setImageFiles([]);
     }
   };
 
+  // 批量上传图片
   const handleImageUpload = async () => {
-    if (!imageFile) return;
+    if (!imageFiles.length) return;
     setImageLoading(true);
     setImageError(null);
-    setImageResult(null);
+    setImageResults([]);
     const formData = new FormData();
-    formData.append("file", imageFile);
+    imageFiles.forEach(file => formData.append('files', file));
     try {
-      const res = await fetch(`${API_URL}/yolo/predict-image`, {
+      const res = await fetch(`${API_URL}/yolo/predict-images`, {
         method: "POST",
         body: formData,
       });
@@ -157,7 +157,7 @@ export default function DetectionUpload() {
       if (!res.ok) {
         throw new Error(data.error || "上传或识别失败");
       }
-      setImageResult(data.results);
+      setImageResults(data.results);
     } catch (e: any) {
       setImageError(e.message || "请求失败");
     } finally {
@@ -216,46 +216,6 @@ export default function DetectionUpload() {
     }
   };
 
-  // 获取图片原始尺寸
-  useEffect(() => {
-    if (imageRef.current && imagePreview) {
-      const img = imageRef.current;
-      if (img.complete) {
-        setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-      } else {
-        img.onload = () => {
-          setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
-        };
-      }
-    }
-  }, [imagePreview]);
-
-  // 绘制检测框
-  useEffect(() => {
-    if (!imageResult || !imageSize || !imageCanvasRef.current || !imageRef.current) return;
-    const canvas = imageCanvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    // 清空
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // 计算缩放比例
-    const displayWidth = imageRef.current.width;
-    const displayHeight = imageRef.current.height;
-    const scaleX = displayWidth / imageSize.width;
-    const scaleY = displayHeight / imageSize.height;
-    // 绘制每个框
-    imageResult.forEach((item) => {
-      const [x1, y1, x2, y2] = item.bbox;
-      ctx.strokeStyle = "#e53e3e";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
-      ctx.font = "14px Arial";
-      ctx.fillStyle = "#e53e3e";
-      const label = item.class_name || item.class_id;
-      ctx.fillText(`${label} ${(item.confidence * 100).toFixed(1)}%`, x1 * scaleX + 2, y1 * scaleY + 16);
-    });
-  }, [imageResult, imageSize]);
-
   return (
     <Box maxW="4xl" mx="auto" mt={8} p={4}>
       <Tabs.Root value={activeTab} onValueChange={(details) => setActiveTab(details.value)} variant="enclosed">
@@ -267,65 +227,51 @@ export default function DetectionUpload() {
         <Tabs.Content value="image">
           <Box borderWidth={1} borderRadius="lg" boxShadow="md" p={6}>
             <Text fontSize="lg" fontWeight="bold" mb={4}>图片路面灾害检测</Text>
-            
-            {imagePreview && (
-              <Box mb={4} textAlign="center" position="relative" display="inline-block">
-                <Image
-                  src={imagePreview}
-                  alt="预览"
-                  maxH="500px"
-                  maxW="800px"
-                  mx="auto"
-                  borderRadius="md"
-                  ref={imageRef}
-                  style={{ display: "block", width: "auto", height: "auto", maxWidth: "800px", maxHeight: "500px" }}
-                />
-                {/* 画框Canvas */}
-                {imageRef.current && imageRef.current.width && imageRef.current.height && (
-                  <canvas
-                    ref={imageCanvasRef}
-                    width={imageRef.current.width}
-                    height={imageRef.current.height}
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      pointerEvents: "none",
-                      width: imageRef.current.width,
-                      height: imageRef.current.height,
-                      zIndex: 2,
-                    }}
-                  />
-                )}
-              </Box>
-            )}
-            
             <InputGroup>
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageFileChange}
                 style={{ marginBottom: 12 }}
               />
             </InputGroup>
-            
-            <Button onClick={handleImageUpload} disabled={!imageFile || imageLoading} style={{ width: "100%" }}>
-              {imageLoading ? "识别中..." : "上传并识别"}
+            <Button onClick={handleImageUpload} disabled={!imageFiles.length || imageLoading} style={{ width: "100%" }}>
+              {imageLoading ? "识别中..." : "批量上传并识别"}
             </Button>
-            
             <Box mt={6} minH={120} borderWidth={1} borderRadius="md" p={3} bg="gray.50">
               {imageLoading && <Skeleton height="80px" />}
               {imageError && <Box color="red.500">{imageError}</Box>}
-              {imageResult && imageResult.length === 0 && <Box color="gray.500">未检测到病害</Box>}
-              {imageResult && imageResult.length > 0 && (
-                <Box as="ul" pl={4}>
-                  {imageResult.map((item, idx) => (
-                    <li key={idx}>
-                      类型: {item.class_name || item.class_id} ｜ 置信度: {item.confidence.toFixed(2)} ｜
-                      坐标: [{item.bbox.map((v) => v.toFixed(0)).join(", ")}] ｜ 面积: {item.area ? item.area.toFixed(0) : "-"}
-                    </li>
+              {imagePreviews.length > 0 && (
+                <Stack direction="row" gap={4} wrap="wrap">
+                  {imagePreviews.map((src, idx) => (
+                    <Box key={idx} mb={2}>
+                      <Image src={src} alt={`预览${idx+1}`} maxH="120px" maxW="160px" borderRadius="md" />
+                    </Box>
                   ))}
-                </Box>
+                </Stack>
+              )}
+              {imageResults.length > 0 && (
+                <Stack direction="column" gap={6} mt={4}>
+                  {imageResults.map((item, idx) => (
+                    <Box key={idx} borderWidth={1} borderRadius="md" p={4} display="flex" flexDirection="column" alignItems="center" maxW="700px" mx="auto">
+                      <Text fontWeight="bold" mb={2}>{item.filename}</Text>
+                      {item.annotated_image_base64 ? (
+                        <Image src={item.annotated_image_base64} alt={item.filename} maxW="100%" maxH="400px" borderRadius="md" mb={2} style={{objectFit: 'contain', width: '100%', height: 'auto'}} />
+                      ) : (
+                        <Box color="red.500" mb={2}>图片读取失败</Box>
+                      )}
+                      <Box as="ul" pl={2} mt={2} w="100%">
+                        {item.results.length === 0 && <li style={{color:'#888'}}>未检测到病害</li>}
+                        {item.results.map((r: any, i: number) => (
+                          <li key={i} style={{fontSize: '15px', marginBottom: 2}}>
+                            类型: {r.class_name || r.class_id} ｜ 置信度: {r.confidence.toFixed(2)}
+                          </li>
+                        ))}
+                      </Box>
+                    </Box>
+                  ))}
+                </Stack>
               )}
             </Box>
           </Box>

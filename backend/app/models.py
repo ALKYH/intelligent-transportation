@@ -2,6 +2,10 @@ import uuid
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy import Column, LargeBinary
+from sqlalchemy.dialects.postgresql import JSONB
+from datetime import datetime
+from typing import Any
 
 
 # Shared properties
@@ -133,3 +137,12 @@ class TaxiOrder(SQLModel, table=True):
     offutc: str = Field(max_length=32)   # 下车时间戳（UTC时间类型）
     offlat: float                         # 下车点纬度坐标
     offlon: float                         # 下车点经度坐标
+
+class RoadSurfaceDetection(SQLModel, table=True):
+    __tablename__ = "road_surface_detection"
+    id: int | None = Field(default=None, primary_key=True)
+    file_data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
+    file_type: str = Field(nullable=False, max_length=10)
+    disease_info: Any = Field(sa_column=Column(JSONB, nullable=False))
+    detection_time: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    alarm_status: bool = Field(default=False, nullable=False)

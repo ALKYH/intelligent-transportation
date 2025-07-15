@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 import os
 import tempfile
@@ -10,6 +10,10 @@ import shutil
 from datetime import datetime
 from ultralytics import YOLO
 import base64
+from app.models import RoadSurfaceDetection
+from sqlmodel import Session
+from app.core.db import engine
+import copy
 
 router = APIRouter(prefix="/yolo-video", tags=["yolo_video"])
 
@@ -124,13 +128,7 @@ def detect_frames(frames_dir, model):
                         conf = float(box.conf.item())
                         xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
                         area = (xyxy[2] - xyxy[0]) * (xyxy[3] - xyxy[1])
-                        
                         class_name = CLASS_NAMES.get(cls_id, f"未知类别({cls_id})")
-                        
-                        if class_name not in class_counts:
-                            class_counts[class_name] = 0
-                        class_counts[class_name] += 1
-                        
                         detections.append({
                             "class_id": cls_id,
                             "class_name": class_name,
@@ -154,7 +152,7 @@ def detect_frames(frames_dir, model):
         raise Exception(f"检测过程中出错: {str(e)}")
 
 @router.post("/predict-video")
-def predict_video(file: UploadFile = File(...), fps: int = 1):
+def predict_video(file: UploadFile = File(...), fps: int = Form(1)):
     """
     接收一个视频文件，提取帧并进行路面灾害检测
     """
@@ -199,6 +197,28 @@ def predict_video(file: UploadFile = File(...), fps: int = 1):
                     if class_name not in all_class_counts:
                         all_class_counts[class_name] = 0
                     all_class_counts[class_name] += count
+            
+            # === 只存结构化病害对象 ===
+            db_detection_results = []
+            for frame in detection_results:
+                for det in frame.get('detections', []):
+                    db_detection_results.append({
+                        "disease_type": det.get("class_name", ""),
+                        "bbox": det["bbox"],
+                        "area": 10
+                    })
+            with open(video_path, "rb") as f:
+                file_data = f.read()
+            file_type = os.path.splitext(video_path)[-1].lower().replace('.', '')
+            with Session(engine) as session:
+                detection = RoadSurfaceDetection(
+                    file_data=file_data,
+                    file_type=file_type,
+                    disease_info=db_detection_results,  # 只存 disease_type/area/bbox
+                    alarm_status=False
+                )
+                session.add(detection)
+                session.commit()
             
             return {
                 "video_info": {
