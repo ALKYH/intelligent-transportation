@@ -19,6 +19,7 @@ export default function PassengerCountChart() {
   const [date, setDate] = useState(formatDate(new Date('2013-09-12')))
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapOption, setMapOption] = useState<any>(null)
+  const [distanceData, setDistanceData] = useState<any>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -30,6 +31,27 @@ export default function PassengerCountChart() {
   }, [interval])
 
   useEffect(() => {
+    fetch('http://localhost:8000/api/v1/analysis/distance-distribution')
+      .then(res => res.json())
+      .then(data => setDistanceData(data.distance_distribution))
+      .catch(() => setDistanceData(null))
+  }, [])
+
+  useEffect(() => {
+    const jinanPopulation = [
+      { name: '历下区', value: 78 },
+      { name: '市中区', value: 74 },
+      { name: '槐荫区', value: 66 },
+      { name: '天桥区', value: 77 },
+      { name: '历城区', value: 128 },
+      { name: '长清区', value: 62 },
+      { name: '章丘区', value: 104 },
+      { name: '济阳区', value: 58 },
+      { name: '莱芜区', value: 62 },
+      { name: '钢城区', value: 24 },
+      { name: '平阴县', value: 38 },
+      { name: '商河县', value: 60 }
+    ];
     fetch('/assets/jsons/370100_full.json')
       .then(res => res.json())
       .then(geoJson => {
@@ -39,11 +61,16 @@ export default function PassengerCountChart() {
           echarts.registerMap('jinan', geoJson)
           setMapLoaded(true)
           setMapOption({
-            title: { text: '济南市地图', left: 'center' },
-            tooltip: { trigger: 'item' },
+            title: { text: '济南市地图（各区县人口）', left: 'center' },
+            tooltip: {
+              trigger: 'item',
+              formatter: (params: any) => {
+                return `${params.name}<br/>人口：${params.value} 万人`
+              }
+            },
             visualMap: {
-              min: 0,
-              max: 100,
+              min: 20,
+              max: 130,
               left: 'left',
               top: 'bottom',
               text: ['高', '低'],
@@ -52,25 +79,12 @@ export default function PassengerCountChart() {
             },
             series: [
               {
-                name: '区域数据',
+                name: '人口',
                 type: 'map',
                 map: 'jinan',
-                roam: true,
+                roam: false, // 禁止拖动
                 label: { show: true },
-                data: [
-                  { name: '历下区', value: 50 },
-                  { name: '市中区', value: 80 },
-                  { name: '槐荫区', value: 60 },
-                  { name: '天桥区', value: 70 },
-                  { name: '历城区', value: 90 },
-                  { name: '长清区', value: 40 },
-                  { name: '章丘区', value: 30 },
-                  { name: '济阳区', value: 20 },
-                  { name: '莱芜区', value: 10 },
-                  { name: '钢城区', value: 15 },
-                  { name: '平阴县', value: 25 },
-                  { name: '商河县', value: 35 }
-                ]
+                data: jinanPopulation
               }
             ]
           })
@@ -104,6 +118,57 @@ export default function PassengerCountChart() {
       }
     ]
   }
+
+  const pieOption = distanceData ? {
+    title: {
+      text: '不同运输距离占比',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c}单 ({d}%)'
+    },
+    legend: {
+      orient: 'vertical',
+      left: 'left',
+      data: [
+        '短途（<4000米）',
+        '中途（4000-8000米）',
+        '长途（>8000米）'
+      ]
+    },
+    series: [
+      {
+        name: '运输距离',
+        type: 'pie',
+        radius: '60%',
+        data: [
+          {
+            value: distanceData.short_distance.count,
+            name: '短途（<4000米）'
+          },
+          {
+            value: distanceData.medium_distance.count,
+            name: '中途（4000-8000米）'
+          },
+          {
+            value: distanceData.long_distance.count,
+            name: '长途（>8000米）'
+          }
+        ],
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        label: {
+          formatter: '{b}: {d}%'
+        }
+      }
+    ]
+  } : null
 
   return (
     <>
@@ -139,6 +204,13 @@ export default function PassengerCountChart() {
         <ReactECharts style={{height: 500}} option={mapOption} notMerge={true} lazyUpdate={true} />
       ) : (
         <Text>地图加载中...</Text>
+      )}
+      {/* 新增饼图展示 */}
+      <Text mt={8} mb={2} fontWeight="bold">不同运输距离占比：</Text>
+      {distanceData && pieOption ? (
+        <ReactECharts style={{height: 400}} option={pieOption} notMerge={true} lazyUpdate={true} />
+      ) : (
+        <Text>饼图加载中...</Text>
       )}
     </>
   )
