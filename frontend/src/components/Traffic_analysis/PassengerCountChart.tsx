@@ -27,6 +27,23 @@ export default function PassengerCountChart() {
   const [occupiedTaxiData, setOccupiedTaxiData] = useState<any[]>([])
   const [occupiedTaxiLoading, setOccupiedTaxiLoading] = useState(false)
   const [chartType, setChartType] = useState<'passenger' | 'taxi'>('passenger')
+  const [timeLabels, setTimeLabels] = useState<string[]>([])
+
+  useEffect(() => {
+    const labels: string[] = []
+    if (interval === '1h') {
+      for (let i = 0; i < 24; i++) {
+        labels.push(`${String(i).padStart(2, '0')}:00`)
+      }
+    } else { // 15min
+      for (let i = 0; i < 24; i++) {
+        for (let j = 0; j < 60; j += 15) {
+          labels.push(`${String(i).padStart(2, '0')}:${String(j).padStart(2, '0')}`)
+        }
+      }
+    }
+    setTimeLabels(labels)
+  }, [interval])
 
   useEffect(() => {
     setLoading(true)
@@ -38,7 +55,6 @@ export default function PassengerCountChart() {
   }, [interval, date])
 
   useEffect(() => {
-    if (!date) return;
     fetch(`http://localhost:8000/api/v1/analysis/distance-distribution?date=${formatDateParam(date)}`)
       .then(res => res.json())
       .then(data => setDistanceData(data.distance_distribution))
@@ -114,20 +130,22 @@ export default function PassengerCountChart() {
     tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
-      data: statData.map(item => {
-        if (interval === '15min') {
-          return item.interval_start.slice(8, 10) + ':' + item.interval_start.slice(10, 12)
-        } else {
-          return item.interval_start.slice(8, 10) + ':00'
-        }
-      }),
+      data: timeLabels,
       name: '时间',
       axisLabel: { rotate: 45 }
     },
     yAxis: { type: 'value', name: '乘客数量' },
     series: [
       {
-        data: statData.map(item => item.count),
+        data: timeLabels.map(label => {
+          const item = statData.find(d => {
+            const itemLabel = interval === '15min'
+              ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
+              : d.interval_start.slice(8, 10) + ':00'
+            return itemLabel === label
+          })
+          return item ? item.count : null
+        }),
         type: 'line',
         smooth: true,
         areaStyle: {},
@@ -193,20 +211,22 @@ export default function PassengerCountChart() {
     tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
-      data: occupiedTaxiData.map((item: any) => {
-        if (interval === '15min') {
-          return item.interval_start.slice(8, 10) + ':' + item.interval_start.slice(10, 12)
-        } else {
-          return item.interval_start.slice(8, 10) + ':00'
-        }
-      }),
+      data: timeLabels,
       name: '时间',
       axisLabel: { rotate: 45 }
     },
     yAxis: { type: 'value', name: '载客车数量' },
     series: [
       {
-        data: occupiedTaxiData.map((item: any) => item.occupied_taxi_count),
+        data: timeLabels.map(label => {
+          const item = occupiedTaxiData.find((d: any) => {
+            const itemLabel = interval === '15min'
+              ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
+              : d.interval_start.slice(8, 10) + ':00'
+            return itemLabel === label
+          })
+          return item ? item.occupied_taxi_count : null
+        }),
         type: 'line',
         smooth: true,
         areaStyle: {},
@@ -247,20 +267,13 @@ export default function PassengerCountChart() {
       {chartType === 'passenger' ? (
         <>
           <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}乘客数量分布图：</Text>
-          {loading ? (
-            <Text mt={4}>加载中...</Text>
-          ) : (
             <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
-          )}
+
         </>
       ) : (
         <>
           <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}载客车辆分布图：</Text>
-          {occupiedTaxiLoading ? (
-            <Text mt={4}>加载中...</Text>
-          ) : (
             <ReactECharts style={{height: 400}} option={occupiedTaxiOption} notMerge={true} lazyUpdate={true} />
-          )}
         </>
       )}
       {/* 路程分析饼图展示，放在地图上方 */}
