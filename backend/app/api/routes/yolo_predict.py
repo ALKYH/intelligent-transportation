@@ -139,7 +139,7 @@ def predict_images(files: List[UploadFile] = File(...)):
                     db_detection_results.append({
                         "disease_type": item.get("class_name", ""),
                         "bbox": item["bbox"],
-                        "area": item.get("area", None)
+                        "area": 10
                     })
                 with Session(engine) as session:
                     detection = RoadSurfaceDetection(

@@ -205,7 +205,7 @@ def predict_video(file: UploadFile = File(...), fps: int = Form(1)):
                     db_detection_results.append({
                         "disease_type": det.get("class_name", ""),
                         "bbox": det["bbox"],
-                        "area": det.get("area", None)
+                        "area": 10
                     })
             with open(video_path, "rb") as f:
                 file_data = f.read()
