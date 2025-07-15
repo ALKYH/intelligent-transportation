@@ -12,6 +12,10 @@ function formatDate(date: Date) {
   return `${y}-${m}-${d}`
 }
 
+function formatDateParam(date: string) {
+  return date.replace(/-/g, '')
+}
+
 export default function PassengerCountChart() {
   const [statData, setStatData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -23,19 +27,20 @@ export default function PassengerCountChart() {
 
   useEffect(() => {
     setLoading(true)
-    fetch(`http://localhost:8000/api/v1/analysis/passenger-count-distribution?interval=${interval}`)
+    fetch(`http://localhost:8000/api/v1/analysis/passenger-count-distribution?interval=${interval}&date=${formatDateParam(date)}`)
       .then(res => res.json())
       .then(data => setStatData(data))
       .catch(() => setStatData([]))
       .finally(() => setLoading(false))
-  }, [interval])
+  }, [interval, date])
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/v1/analysis/distance-distribution')
+    if (!date) return;
+    fetch(`http://localhost:8000/api/v1/analysis/distance-distribution?date=${formatDateParam(date)}`)
       .then(res => res.json())
       .then(data => setDistanceData(data.distance_distribution))
       .catch(() => setDistanceData(null))
-  }, [])
+  }, [date])
 
   useEffect(() => {
     const jinanPopulation = [
@@ -121,7 +126,7 @@ export default function PassengerCountChart() {
 
   const pieOption = distanceData ? {
     title: {
-      text: '不同运输距离占比',
+      text: '路程分析',
       left: 'center'
     },
     tooltip: {
@@ -198,19 +203,19 @@ export default function PassengerCountChart() {
       ) : (
         <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
       )}
+      {/* 路程分析饼图展示，放在地图上方 */}
+      <Text mt={8} mb={2} fontWeight="bold">路程分析：</Text>
+      {date && distanceData && pieOption ? (
+        <ReactECharts style={{height: 400}} option={pieOption} notMerge={true} lazyUpdate={true} />
+      ) : (
+        <Text>请选择日期后查看路程分析</Text>
+      )}
       {/* 新增济南市地图展示 */}
       <Text mt={8} mb={2} fontWeight="bold">济南市地图：</Text>
       {mapLoaded && mapOption ? (
         <ReactECharts style={{height: 500}} option={mapOption} notMerge={true} lazyUpdate={true} />
       ) : (
         <Text>地图加载中...</Text>
-      )}
-      {/* 新增饼图展示 */}
-      <Text mt={8} mb={2} fontWeight="bold">不同运输距离占比：</Text>
-      {distanceData && pieOption ? (
-        <ReactECharts style={{height: 400}} option={pieOption} notMerge={true} lazyUpdate={true} />
-      ) : (
-        <Text>饼图加载中...</Text>
       )}
     </>
   )

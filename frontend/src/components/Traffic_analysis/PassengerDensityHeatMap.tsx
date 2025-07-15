@@ -78,7 +78,12 @@ export default function PassengerDensityHeatMap() {
   useEffect(() => {
     // 百度地图API初始化
     const initMap = () => {
-      if (typeof window !== 'undefined' && window.BMap) {
+      if (
+        typeof window !== 'undefined' &&
+        window.BMap &&
+        window.BMapLib &&
+        window.BMapLib.HeatmapOverlay
+      ) {
         const map = new window.BMap.Map(mapRef.current)
         mapInstanceRef.current = map
         // 设置济南市中心坐标
@@ -115,11 +120,17 @@ export default function PassengerDensityHeatMap() {
           heatmapScript.onload = initMap
           document.head.appendChild(heatmapScript)
         }
-      } else {
+      } else if (window.BMap && window.BMapLib && window.BMapLib.HeatmapOverlay) {
         initMap()
       }
     }
     loadBaiduMap()
+    // 清理定时器和热力图引用
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      heatmapOverlayRef.current = null
+      mapInstanceRef.current = null
+    }
   }, [])
 
   // 动态轮播主逻辑
@@ -153,7 +164,7 @@ export default function PassengerDensityHeatMap() {
           lat: parseFloat(spot.lat),
           count: parseInt(spot.count)+40
         })).filter((p: any) => !isNaN(p.lng) && !isNaN(p.lat))
-        if (window.BMap && window.BMapLib && heatmapOverlayRef.current) {
+        if (window.BMap && window.BMapLib && window.BMapLib.HeatmapOverlay && heatmapOverlayRef.current) {
           heatmapOverlayRef.current.setDataSet({ data: [], max: 100 })
           heatmapOverlayRef.current.setDataSet({
             data: points,
