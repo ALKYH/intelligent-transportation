@@ -97,7 +97,7 @@ function Login() {
           placeholder="密码"
           errors={errors}
         />
-        <RouterLink to="/recover-password" className="main-link">
+        <RouterLink to="/recover-password" className="main-link" style={{ display: 'inline-block', width: 'auto', minWidth: 0, padding: 0, marginBottom: 8, alignSelf: 'flex-start' }}>
           忘记密码？
         </RouterLink>
         <Button variant="solid" type="submit" loading={isSubmitting} size="md">

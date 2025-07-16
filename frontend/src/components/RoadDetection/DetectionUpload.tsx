@@ -34,7 +34,7 @@ const API_URL = "http://localhost:8000/api/v1";
 // 帧图片+标注框组件
 interface FrameWithBoxesProps {
   src: string;
-  detections: Array<{ bbox: number[]; class_name?: string; class_id?: number}>;
+  detections: Array<{ bbox: number[]; class_name?: string; class_id?: number }>;
 }
 function FrameWithBoxes({ src, detections }: FrameWithBoxesProps) {
   const imgRef = useRef<HTMLImageElement>(null);
@@ -45,7 +45,6 @@ function FrameWithBoxes({ src, detections }: FrameWithBoxesProps) {
     const img = imgRef.current;
     if (!img) return;
     function updateSize() {
-      if (!img) return;
       setImgSize({ width: img.width, height: img.height, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
     }
     if (img.complete) {
@@ -73,8 +72,7 @@ function FrameWithBoxes({ src, detections }: FrameWithBoxesProps) {
       ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
       ctx.font = "14px Arial";
       ctx.fillStyle = "#e53e3e";
-
-      ctx.fillText(det.class_name_en || det.class_name || String(det.class_id ?? ''), x1 * scaleX + 2, y1 * scaleY + 16);
+      ctx.fillText(det.class_name ?? String(det.class_id ?? ''), x1 * scaleX + 2, y1 * scaleY + 16);
     });
   }, [src, detections, imgSize]);
 
@@ -268,12 +266,6 @@ export default function DetectionUpload() {
                         {item.results.map((r: any, i: number) => (
                           <li key={i} style={{fontSize: '15px', marginBottom: 2}}>
                             类型: {r.class_name || r.class_id} ｜ 置信度: {r.confidence.toFixed(2)}
-                            {typeof r.length_m === 'number' && (
-                              <> ｜ 长度: {r.length_m.toFixed(2)} m</>
-                            )}
-                            {typeof r.area_m2 === 'number' && (
-                              <> ｜ 面积: {r.area_m2.toFixed(2)} m²</>
-                            )}
                           </li>
                         ))}
                       </Box>
