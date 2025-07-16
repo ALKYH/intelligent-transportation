@@ -245,10 +245,12 @@ def predict_video(file: UploadFile = File(...), fps: int = Form(1)):
                     db_detection_results.append(db_item)
             with open(video_path, "rb") as f:
                 file_data = f.read()
+            import base64
+            file_data_base64 = base64.b64encode(file_data).decode("utf-8")
             file_type = os.path.splitext(video_path)[-1].lower().replace('.', '')
             with Session(engine) as session:
                 detection = RoadSurfaceDetection(
-                    file_data=file_data,
+                    file_data=file_data_base64,
                     file_type=file_type,
                     disease_info=db_detection_results,  # 只存 disease_type/area/bbox
                     alarm_status=False,

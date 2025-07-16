@@ -250,14 +250,37 @@ export default function RoadRepairVerify() {
         {roadDetection && (
           <Box p={4} bg="gray.50" borderRadius="md">
             {/* 文件展示 */}
-            {roadDetection.file_data && roadDetection.file_type && roadDetection.file_type.match(/(jpg|jpeg|png|gif)/i) && (
-              <Box mt={2}>
-                <Text fontWeight="bold">原始图片（含检测框）：</Text>
-                <FrameWithBoxes
-                  src={`data:image/${roadDetection.file_type};base64,${roadDetection.file_data}`}
-                  detections={roadDetection.disease_info}
-                />
-              </Box>
+            {roadDetection.file_data && roadDetection.file_type && (
+              roadDetection.file_type.match(/(jpg|jpeg|png|gif)/i) ? (
+                <Box mt={2}>
+                  <Text fontWeight="bold">原始图片（含检测框）：</Text>
+                  <FrameWithBoxes
+                    src={`data:image/${roadDetection.file_type};base64,${roadDetection.file_data}`}
+                    detections={roadDetection.disease_info}
+                  />
+                </Box>
+              ) : roadDetection.file_type.match(/(mp4|webm|ogg)/i) ? (
+                (() => {
+                  const videoMimeMap: Record<string, string> = {
+                    mp4: 'video/mp4',
+                    webm: 'video/webm',
+                    ogg: 'video/ogg'
+                  };
+                  const videoMime = videoMimeMap[roadDetection.file_type?.toLowerCase() || ''] || 'video/mp4';
+                  return (
+                    <Box mt={2}>
+                      <Text fontWeight="bold">原始视频：</Text>
+                      <video
+                        src={`data:${videoMime};base64,${roadDetection.file_data}`}
+                        controls
+                        style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid #eee" }}
+                      />
+                    </Box>
+                  );
+                })()
+              ) : (
+                <Text color="gray.500">不支持的文件类型</Text>
+              )
             )}
             <Text><b>病害信息:</b></Text>
             {Array.isArray(roadDetection.disease_info) && roadDetection.disease_info.length > 0 ? (
