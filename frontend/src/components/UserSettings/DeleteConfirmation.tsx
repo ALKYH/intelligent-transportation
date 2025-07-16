@@ -32,7 +32,7 @@ const DeleteConfirmation = () => {
   const mutation = useMutation({
     mutationFn: () => UsersService.deleteUserMe(),
     onSuccess: () => {
-      showSuccessToast("Your account has been successfully deleted")
+      showSuccessToast("您的账户已成功删除")
       setIsOpen(false)
       logout()
     },
@@ -59,7 +59,7 @@ const DeleteConfirmation = () => {
       >
         <DialogTrigger asChild>
           <Button variant="solid" colorPalette="red" mt={4}>
-            Delete
+            删除
           </Button>
         </DialogTrigger>
 
@@ -67,14 +67,13 @@ const DeleteConfirmation = () => {
           <form onSubmit={handleSubmit(onSubmit)}>
             <DialogCloseTrigger />
             <DialogHeader>
-              <DialogTitle>Confirmation Required</DialogTitle>
+              <DialogTitle>确认提示</DialogTitle>
             </DialogHeader>
             <DialogBody>
               <Text mb={4}>
-                All your account data will be{" "}
-                <strong>permanently deleted.</strong> If you are sure, please
-                click <strong>"Confirm"</strong> to proceed. This action cannot
-                be undone.
+                您的所有账户数据将被{" "}
+                <strong>永久删除。</strong> 如果您确定，请点击{" "}
+                <strong>"确认"</strong> 继续。此操作无法撤销。
               </Text>
             </DialogBody>
 
@@ -86,7 +85,7 @@ const DeleteConfirmation = () => {
                     colorPalette="gray"
                     disabled={isSubmitting}
                   >
-                    Cancel
+                    取消
                   </Button>
                 </DialogActionTrigger>
                 <Button
@@ -95,7 +94,7 @@ const DeleteConfirmation = () => {
                   type="submit"
                   loading={isSubmitting}
                 >
-                  Delete
+                  删除
                 </Button>
               </ButtonGroup>
             </DialogFooter>

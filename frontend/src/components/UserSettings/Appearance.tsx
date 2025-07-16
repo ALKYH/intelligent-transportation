@@ -10,7 +10,7 @@ const Appearance = () => {
     <>
       <Container maxW="full">
         <Heading size="sm" py={4}>
-          Appearance
+          外观设置
         </Heading>
 
         <RadioGroup
@@ -19,9 +19,9 @@ const Appearance = () => {
           colorPalette="teal"
         >
           <Stack>
-            <Radio value="system">System</Radio>
-            <Radio value="light">Light Mode</Radio>
-            <Radio value="dark">Dark Mode</Radio>
+            <Radio value="system">系统</Radio>
+            <Radio value="light">浅色模式</Radio>
+            <Radio value="dark">深色模式</Radio>
           </Stack>
         </RadioGroup>
       </Container>
