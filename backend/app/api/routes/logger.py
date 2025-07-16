@@ -21,13 +21,15 @@ def create_road_detection(
 @router.get("/road-surface-detection/{detection_id}", response_model=dict)
 def read_road_detection(detection_id: int):
     result = logger.get_road_surface_detection(detection_id)
+    print(result)
     if not result:
         raise HTTPException(status_code=404, detail="Detection not found")
-    return result
+    return result[0]
 
 @router.get("/road-surface-detection", response_model=list)
 def read_all_road_detections():
     results = logger.get_road_surface_detection()
+    print(results)
     return results
 
 @router.put("/road-surface-detection/{detection_id}", response_model=dict)
@@ -57,12 +59,12 @@ def create_attack(
         return {"message": "Attack add successfully"}
     raise HTTPException(status_code=500, detail="创建记录失败")
 
-@router.get("/malicious-attack/{attack_id}", response_model=dict)
+@router.get("/malicious-attack/{attack_id}", response_model=list)
 def read_attack(attack_id: int):
     result = logger.get_malicious_attacks(attack_id)
     if not result:
         raise HTTPException(status_code=404, detail="Attack not found")
-    return result
+    return result[0]
 
 @router.get("/malicious-attack", response_model=list)
 def read_all_attacks():
