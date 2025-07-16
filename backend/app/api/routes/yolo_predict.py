@@ -81,6 +81,7 @@ def predict_image(file: UploadFile = File(...)):
                     parsed.append({
                         "class_id": cls_id,
                         "class_name": class_name,
+                        "class_name_en": CLASS_NAMES_EN.get(cls_id, f"Unknown({cls_id})"),
                         "confidence": conf,
                         "bbox": xyxy,
                         **area_or_length
@@ -143,6 +144,7 @@ def predict_images(files: List[UploadFile] = File(...)):
                         parsed.append({
                             "class_id": cls_id,
                             "class_name": class_name,
+                            "class_name_en": CLASS_NAMES_EN.get(cls_id, f"Unknown({cls_id})"),
                             "confidence": conf,
                             "bbox": xyxy,
                             **area_or_length
@@ -150,7 +152,7 @@ def predict_images(files: List[UploadFile] = File(...)):
                         # 画框
                         x1i, y1i, x2i, y2i = map(int, xyxy)
                         cv2.rectangle(img, (x1i, y1i), (x2i, y2i), (0,0,255), 2)
-                        label = str(cls_id)
+                        label = CLASS_NAMES_EN.get(cls_id, f"Unknown({cls_id})")
                         cv2.putText(img, label, (x1i, y1i+16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
                 # 转base64
                 _, buffer = cv2.imencode('.jpg', img)

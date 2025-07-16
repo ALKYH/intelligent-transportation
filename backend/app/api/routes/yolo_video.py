@@ -30,6 +30,14 @@ CLASS_NAMES = {
     4: "修补",
     5: "坑洞"
 }
+CLASS_NAMES_EN = {
+    0: "Longitudinal Crack",
+    1: "Transverse Crack",
+    2: "Alligator Crack",
+    3: "Diagonal Crack",
+    4: "Patch",
+    5: "Pothole"
+}
 
 # 设定参考物实际长度和像素长度
 PLATE_REAL_LENGTH = 0.45  # 45厘米
@@ -108,11 +116,8 @@ def detect_frames(frames_dir, model):
         results = []
         for i, frame_file in enumerate(frame_files):
             frame_path = os.path.join(frames_dir, frame_file)
-            
-            # 读取图片为base64
-            with open(frame_path, "rb") as f:
-                img_base64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
-            
+            # 读取图片
+            img = cv2.imread(frame_path)
             # 运行检测
             detection_results = model.predict(
                 source=frame_path,
@@ -120,16 +125,12 @@ def detect_frames(frames_dir, model):
                 conf=0.25,  # 置信度阈值
                 iou=0.45,   # NMS IoU阈值
             )
-            
             if detection_results and len(detection_results) > 0:
                 result = detection_results[0]
-                
                 if result.boxes is not None and len(result.boxes) > 0:
-                    # 统计检测结果
                     class_counts = {}
                     detections = []
-                    
-                    for box in result.boxes:
+                    for idx, box in enumerate(result.boxes):
                         cls_id = int(box.cls.item())
                         conf = float(box.conf.item())
                         xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
@@ -145,9 +146,12 @@ def detect_frames(frames_dir, model):
                         else:
                             real_area = real_w * real_h
                             area_or_length = {"area_m2": real_area}
+                        detection_number = idx + 1
                         detections.append({
+                            "number": detection_number,
                             "class_id": cls_id,
                             "class_name": class_name,
+                            "class_name_en": CLASS_NAMES_EN.get(cls_id, f"Unknown({cls_id})"),
                             "confidence": conf,
                             "bbox": xyxy,
                             **area_or_length
@@ -155,7 +159,14 @@ def detect_frames(frames_dir, model):
                         if class_name not in class_counts:
                             class_counts[class_name] = 0
                         class_counts[class_name] += 1
-                    # 记录有检测结果的帧
+                        # 画框和类别+编号
+                        x1i, y1i, x2i, y2i = map(int, xyxy)
+                        cv2.rectangle(img, (x1i, y1i), (x2i, y2i), (0,0,255), 2)
+                        label = f"{CLASS_NAMES_EN.get(cls_id, f'Unknown({cls_id})')} #{detection_number}"
+                        cv2.putText(img, label, (x1i, y1i+16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                    # 转base64
+                    _, buffer = cv2.imencode('.jpg', img)
+                    img_base64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode()
                     results.append({
                         'frame_file': img_base64,
                         'frame_index': i,
