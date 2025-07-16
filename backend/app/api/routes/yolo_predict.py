@@ -34,6 +34,11 @@ CLASS_NAMES_EN = {
     5: "Pothole"
 }
 
+# 设定参考物实际长度和像素长度
+PLATE_REAL_LENGTH = 0.45  # 45厘米
+PLATE_PIXEL_LENGTH = 105   # 105像素
+GSD = PLATE_REAL_LENGTH / PLATE_PIXEL_LENGTH  # 单位：米/像素
+
 @router.post("/predict-image")
 def predict_image(file: UploadFile = File(...)):
     """
@@ -60,10 +65,24 @@ def predict_image(file: UploadFile = File(...)):
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
                     xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
+                    class_name = CLASS_NAMES.get(cls_id, f"未知类别({cls_id})")
+                    x1, y1, x2, y2 = xyxy
+                    box_w = x2 - x1
+                    box_h = y2 - y1
+                    real_w = box_w * GSD
+                    real_h = box_h * GSD
+                    if class_name in ["纵向裂缝", "横向裂缝", "斜向裂缝"]:
+                        real_length = max(real_w, real_h)
+                        area_or_length = {"length_m": real_length}
+                    else:
+                        real_area = real_w * real_h
+                        area_or_length = {"area_m2": real_area}
                     parsed.append({
                         "class_id": cls_id,
+                        "class_name": class_name,
                         "confidence": conf,
-                        "bbox": xyxy
+                        "bbox": xyxy,
+                        **area_or_length
                     })
             return {"results": parsed}
     except Exception as e:
@@ -109,17 +128,29 @@ def predict_images(files: List[UploadFile] = File(...)):
                         conf = float(box.conf[0])
                         xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
                         class_name = CLASS_NAMES.get(cls_id, f"未知类别({cls_id})")
+                        x1, y1, x2, y2 = xyxy
+                        box_w = x2 - x1
+                        box_h = y2 - y1
+                        real_w = box_w * GSD
+                        real_h = box_h * GSD
+                        if class_name in ["纵向裂缝", "横向裂缝", "斜向裂缝"]:
+                            real_length = max(real_w, real_h)
+                            area_or_length = {"length_m": real_length}
+                        else:
+                            real_area = real_w * real_h
+                            area_or_length = {"area_m2": real_area}
                         parsed.append({
                             "class_id": cls_id,
                             "class_name": class_name,
                             "confidence": conf,
-                            "bbox": xyxy
+                            "bbox": xyxy,
+                            **area_or_length
                         })
                         # 画框
-                        x1, y1, x2, y2 = map(int, xyxy)
-                        cv2.rectangle(img, (x1, y1), (x2, y2), (0,0,255), 2)
-                        label = str(cls_id)  # 只用数字做标注
-                        cv2.putText(img, label, (x1, y1+16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                        x1i, y1i, x2i, y2i = map(int, xyxy)
+                        cv2.rectangle(img, (x1i, y1i), (x2i, y2i), (0,0,255), 2)
+                        label = str(cls_id)
+                        cv2.putText(img, label, (x1i, y1i+16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
                 # 转base64
                 _, buffer = cv2.imencode('.jpg', img)
                 img_base64 = base64.b64encode(buffer).decode()
@@ -136,16 +167,26 @@ def predict_images(files: List[UploadFile] = File(...)):
                 # === 只存结构化病害对象 ===
                 db_detection_results = []
                 for item in parsed:
-                    db_detection_results.append({
-                        "disease_type": item.get("class_name", ""),
+                    class_name = item.get("class_name", "")
+                    # 裂缝类
+                    if class_name in ["纵向裂缝", "横向裂缝", "斜向裂缝"]:
+                        length_m = item.get("length_m", 0)
+                        area_m2 = 0
+                    else:
+                        length_m = 0
+                        area_m2 = item.get("area_m2", 0)
+                    db_item = {
+                        "disease_type": class_name,
                         "bbox": item["bbox"],
-                        "area": 10
-                    })
+                        "length_m": length_m,
+                        "area_m2": area_m2
+                    }
+                    db_detection_results.append(db_item)
                 with Session(engine) as session:
                     detection = RoadSurfaceDetection(
                         file_data=file_data,
                         file_type=file_type,
-                        disease_info=db_detection_results,  # 只存 disease_type/area/bbox
+                        disease_info=db_detection_results,  # 只存 disease_type/area/length/bbox
                         alarm_status=False
                     )
                     session.add(detection)
