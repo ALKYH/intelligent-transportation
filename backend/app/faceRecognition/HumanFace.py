@@ -55,6 +55,8 @@ class FaceVerificationSystem:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         # 拼接模型的绝对路径
         absolute_model_path = os.path.join(current_dir, model_path)
+
+        absolute_aes_key_path = os.path.join(current_dir, "aes_key.bin")
         
         # 检查模型文件是否存在，如果不存在则使用默认的 YOLO 模型
         if os.path.exists(absolute_model_path):
@@ -84,12 +86,12 @@ class FaceVerificationSystem:
             self.conn = None
 
         # 生成或加载 AES 密钥
-        if not os.path.exists('aes_key.bin'):
+        if not os.path.exists(absolute_aes_key_path):
             self.aes_key = generate_aes_key()
-            with open('aes_key.bin', 'wb') as f:
+            with open(absolute_aes_key_path, 'wb') as f:
                 f.write(self.aes_key)
         else:
-            with open('aes_key.bin', 'rb') as f:
+            with open(absolute_aes_key_path, 'rb') as f:
                 self.aes_key = f.read()
         
         if self.conn:
