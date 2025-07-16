@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 const apiUrl = "http://localhost:8000/api/v1";
-import { Route } from "../../routes/repair";
 import { Field } from "../ui/field";
 import { Button } from "../ui/button";
 import { InputGroup } from "../ui/input-group";
@@ -287,9 +286,9 @@ export default function RoadRepairVerify() {
               roadDetection.disease_info.map((item: any, idx: number) => (
                 <Box key={idx} pl={4} mb={2} borderLeft="2px solid #eee">
                   <Text>类型: {item.disease_type}</Text>
-                  {item.area_m2 !== 0 ? (
+                  {typeof item.area_m2 === "number" && item.area_m2 !== 0 ? (
                     <Text>面积: {item.area_m2.toFixed(2)} m²</Text>
-                  ) : item.length_m !== 0 ? (
+                  ) : typeof item.length_m === "number" && item.length_m !== 0 ? (
                     <Text>长度: {item.length_m.toFixed(2)} m</Text>
                   ) : null}
                 </Box>

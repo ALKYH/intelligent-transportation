@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Container, Heading, Table, Link, Button, Spinner } from "@chakra-ui/react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link as RouterLink } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_layout/warning/road")({
   component: RoadWarningPage,
@@ -13,7 +13,7 @@ function RoadWarningPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/logger/road-surface-detection");
+      const res = await fetch("http://localhost:8000/api/v1/logger/road-surface-detection");
       const json = await res.json();
       setData(Array.isArray(json) ? json : []);
     } catch (e) {
@@ -36,7 +36,7 @@ function RoadWarningPage() {
       <Table.Root size={{ base: "sm", md: "md" }}>
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader w="sm">检测结构ID</Table.ColumnHeader>
+            <Table.ColumnHeader w="sm">病害路面id</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">原始视频/图片</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">检测时间</Table.ColumnHeader>
             <Table.ColumnHeader w="sm">是否已处理</Table.ColumnHeader>
@@ -58,17 +58,18 @@ function RoadWarningPage() {
               <Table.Row key={row.id}>
                 <Table.Cell>{row.id}</Table.Cell>
                 <Table.Cell>
-                  <Link
-                    href={`data:${row.file_type.startsWith('mp4') ? 'video' : 'image'}/${row.file_type};base64,${row.file_data}`}
-                    download={`下载.${row.file_type}`}
-                    color="blue.500"
-                    textDecoration="underline"
-                    fontSize="md"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    下载链接
-                  </Link>
+                  {row.file_type.startsWith('mp4') ? (
+                    <video controls style={{ maxWidth: 200, maxHeight: 120 }}>
+                      <source src={`data:video/${row.file_type};base64,${row.file_data}`} type={`video/${row.file_type}`} />
+                      您的浏览器不支持视频播放。
+                    </video>
+                  ) : (
+                    <img
+                      src={`data:image/${row.file_type};base64,${row.file_data}`}
+                      alt="预览"
+                      style={{ maxWidth: 200, maxHeight: 120 }}
+                    />
+                  )}
                 </Table.Cell>
                 <Table.Cell>
                   {row.detection_time
@@ -83,7 +84,20 @@ function RoadWarningPage() {
                       }).replace(/\//g, '-')
                     : ''}
                 </Table.Cell>
-                <Table.Cell>{row.alarm_status ? "已处理" : "未处理"}</Table.Cell>
+                <Table.Cell>{row.alarm_status ? "已处理" : (
+                  <>
+                    未处理
+                    <RouterLink
+                      to={`/repair?id=${row.id}`}
+                      style={{ marginLeft: 8 }}
+                    >
+                      <Button size="sm" colorScheme="blue">
+                        去处理
+                      </Button>
+                    </RouterLink>
+                  </>
+                )}
+                </Table.Cell>
               </Table.Row>
             ))
           )}
