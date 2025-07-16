@@ -7,9 +7,13 @@ import { Skeleton } from "../ui/skeleton";
 interface DetectionResult {
   class_id: number;
   class_name?: string;
+  class_name_en?: string;
   confidence: number;
   bbox: number[];
   area?: number;
+  length_m?: number;
+  area_m2?: number;
+  number?: number;
 }
 
 interface VideoDetectionResult {
@@ -34,62 +38,12 @@ const API_URL = "http://localhost:8000/api/v1";
 // 帧图片+标注框组件
 interface FrameWithBoxesProps {
   src: string;
-  detections: Array<{ bbox: number[]; class_name?: string; class_id?: number }>;
+  detections: Array<{ bbox: number[]; class_name?: string; class_name_en?: string; class_id?: number}>;
 }
-function FrameWithBoxes({ src, detections }: FrameWithBoxesProps) {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [imgSize, setImgSize] = useState({ width: 0, height: 0, naturalWidth: 0, naturalHeight: 0 });
-
-  useEffect(() => {
-    const img = imgRef.current;
-    if (!img) return;
-    function updateSize() {
-      setImgSize({ width: img.width, height: img.height, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
-    }
-    if (img.complete) {
-      updateSize();
-    } else {
-      img.onload = updateSize;
-    }
-  }, [src]);
-
-  useEffect(() => {
-    const img = imgRef.current;
-    const canvas = canvasRef.current;
-    if (!img || !canvas) return;
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    detections?.forEach(det => {
-      const [x1, y1, x2, y2] = det.bbox;
-      const scaleX = img.width / (img.naturalWidth || 1);
-      const scaleY = img.height / (img.naturalHeight || 1);
-      ctx.strokeStyle = "#e53e3e";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x1 * scaleX, y1 * scaleY, (x2 - x1) * scaleX, (y2 - y1) * scaleY);
-      ctx.font = "14px Arial";
-      ctx.fillStyle = "#e53e3e";
-      ctx.fillText(det.class_name ?? String(det.class_id ?? ''), x1 * scaleX + 2, y1 * scaleY + 16);
-    });
-  }, [src, detections, imgSize]);
-
+function FrameWithBoxes({ src }: FrameWithBoxesProps) {
   return (
-    <Box position="relative" display="inline-block">
-      <Image ref={imgRef} src={src} alt="帧图片" maxW="120px" maxH="120px" />
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          pointerEvents: "none",
-          width: imgSize.width,
-          height: imgSize.height,
-        }}
-      />
+    <Box position="relative" display="inline-block" width="100%" height="100%">
+      <Image src={src} alt="帧图片" width="100%" height="100%" style={{display: 'block', objectFit: 'contain'}} />
     </Box>
   );
 }
@@ -266,6 +220,12 @@ export default function DetectionUpload() {
                         {item.results.map((r: any, i: number) => (
                           <li key={i} style={{fontSize: '15px', marginBottom: 2}}>
                             类型: {r.class_name || r.class_id} ｜ 置信度: {r.confidence.toFixed(2)}
+                            {typeof r.length_m === 'number' && (
+                              <> ｜ 长度: {r.length_m.toFixed(2)} m</>
+                            )}
+                            {typeof r.area_m2 === 'number' && (
+                              <> ｜ 面积: {r.area_m2.toFixed(2)} m²</>
+                            )}
                           </li>
                         ))}
                       </Box>
@@ -367,16 +327,36 @@ export default function DetectionUpload() {
                         {videoResult.frame_results.map((frame, idx) => (
                           <Box key={idx} p={2} borderWidth={1} borderRadius="md" mb={2} display="flex" alignItems="flex-start" gap={4}>
                             {/* 用新组件显示带标注框的帧图片 */}
-                            <FrameWithBoxes src={frame.frame_file} detections={frame.detections} />
+                            <Box width="500px" height="500px" display="flex" alignItems="center" justifyContent="center" borderRadius="2xl" boxShadow="lg" overflow="hidden" bg="gray.100" mx="auto" mb={4}>
+                              <FrameWithBoxes src={frame.frame_file} detections={frame.detections} />
+                            </Box>
                             {/* 检测结果信息 */}
-                            <Box flex={1} minW={0}>
-                              <Text fontWeight="semibold">帧 {frame.frame_index + 1}</Text>
-                              <Text fontSize="sm" color="gray.600">检测到 {frame.total_detections} 个病害</Text>
-                              <Stack direction="row" gap={2} mt={1} wrap="wrap">
+                            <Box flex={1} minW={0} pl={4} display="flex" flexDirection="column" justifyContent="center" alignItems="flex-start" width="100%">
+                              <Text fontWeight="bold" fontSize="md" mb={1} lineHeight={1.2}>帧 {frame.frame_index + 1}</Text>
+                              <Text fontSize="sm" color="gray.700" mb={2} lineHeight={1.2}>检测到 <b>{frame.total_detections}</b> 个病害</Text>
+                              <Stack direction="row" gap={1} mt={0} wrap="wrap" mb={3}>
                                 {Object.entries(frame.class_counts).map(([className, count]) => (
-                                  <Badge key={className} size="sm" colorScheme="red">
+                                  <Badge key={className} size="sm" colorScheme="red" variant="subtle">
                                     {className}: {count}
                                   </Badge>
+                                ))}
+                              </Stack>
+                              {/* 每个病害详细信息卡片式展示 */}
+                              <Stack gap={2} width="100%">
+                                {frame.detections.map((det, i) => (
+                                  <Box key={i} px={3} py={2} borderRadius="md" bg="#f7fafc" boxShadow="xs" width="100%" display="flex" flexDirection="row" justifyContent="space-between" alignItems="center">
+                                    <Box fontWeight="medium" color="#222">
+                                      <span style={{marginRight: 8, color: '#e53e3e'}}>#{det.number}</span>{det.class_name}
+                                    </Box>
+                                    <Box fontSize="13px" color="#666" display="flex" flexDirection="row" gap={3}>
+                                      {typeof det.length_m === 'number' && (
+                                        <span>长度: <b>{det.length_m.toFixed(2)}</b> m</span>
+                                      )}
+                                      {typeof det.area_m2 === 'number' && (
+                                        <span>面积: <b>{det.area_m2.toFixed(2)}</b> m²</span>
+                                      )}
+                                    </Box>
+                                  </Box>
                                 ))}
                               </Stack>
                             </Box>
