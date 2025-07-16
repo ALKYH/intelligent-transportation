@@ -164,6 +164,7 @@ def predict_images(files: List[UploadFile] = File(...)):
                 # 先读取原始图片二进制和文件类型
                 with open(img_path, "rb") as f:
                     file_data = f.read()
+                file_data_base64 = base64.b64encode(file_data).decode("utf-8")
                 file_type = os.path.splitext(filename)[-1].lower().replace('.', '')
                 # === 只存结构化病害对象 ===
                 db_detection_results = []
@@ -185,7 +186,7 @@ def predict_images(files: List[UploadFile] = File(...)):
                     db_detection_results.append(db_item)
                 with Session(engine) as session:
                     detection = RoadSurfaceDetection(
-                        file_data=file_data,
+                        file_data=file_data_base64,  # 存base64字符串
                         file_type=file_type,
                         disease_info=db_detection_results,  # 只存 disease_type/area/length/bbox
                         alarm_status=False,

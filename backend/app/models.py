@@ -2,7 +2,7 @@ import uuid
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
-from sqlalchemy import Column, LargeBinary
+from sqlalchemy import Column, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from typing import Any
@@ -141,7 +141,7 @@ class TaxiOrder(SQLModel, table=True):
 class RoadSurfaceDetection(SQLModel, table=True):
     __tablename__ = "road_surface_detection"
     id: int | None = Field(default=None, primary_key=True)
-    file_data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
+    file_data: str = Field(sa_column=Column(Text, nullable=False))
     file_type: str = Field(nullable=False, max_length=10)
     disease_info: Any = Field(sa_column=Column(JSONB, nullable=False))
     detection_time: datetime = Field(default_factory=datetime.utcnow, nullable=False)
