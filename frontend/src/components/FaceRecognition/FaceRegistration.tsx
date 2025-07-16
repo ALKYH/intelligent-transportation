@@ -205,7 +205,7 @@ export function FaceRegistration() {
   }
 
   // 检查人脸是否已存在
-  const checkFaceExists = async (file: File): Promise<boolean> => {
+  const checkFaceExists = async (file: File): Promise<{ exists?: boolean, status?: string, exception?: string }> => {
     try {
       console.log("前端: 开始检查人脸")
       const formData = new FormData()
@@ -229,16 +229,17 @@ export function FaceRegistration() {
       if (response.ok) {
         const data = await response.json()
         console.log(`前端: 人脸检查响应数据:`, data)
-        return data.exists || false
+        return data
       }
       console.log(`前端: 人脸检查失败，状态码: ${response.status}`)
-      return false
+      return { status: "failure", exception: `HTTP ${response.status}` }
     } catch (error: any) {
       console.error("前端: 检查人脸失败:", error)
       if (error.name === 'AbortError') {
         console.error("前端: 人脸检查请求超时")
+        return { status: "failure", exception: "请求超时" }
       }
-      return false
+      return { status: "failure", exception: error?.message || "未知错误" }
     }
   }
 
@@ -273,10 +274,18 @@ export function FaceRegistration() {
       console.log("前端: 注册响应数据:", data)
       setRegisterResult(data)
 
+      // 新增：活体检测未通过或注册失败时直接返回，避免后续逻辑误判
+      if (data.status === "failure") {
+        if (data.exception === "活体检测未通过") {
+          showToast("活体检测未通过，请确保为真人自拍", "error")
+        } else {
+          showToast(data.exception || "注册失败", "error")
+        }
+        return data
+      }
+
       if (data.status === "success") {
         showToast(data.message || "注册成功", "success")
-      } else {
-        showToast(data.exception || "注册失败", "error")
       }
       return data
     } catch (error: any) {
@@ -324,10 +333,18 @@ export function FaceRegistration() {
       return
     }
 
-    // 检查人脸是否已存在
-    const faceExists = await checkFaceExists(selectedFile)
-    console.log(`前端: 人脸存在检查结果: ${faceExists}`)
-    if (faceExists) {
+    // 检查人脸是否已存在或活体检测未通过
+    const faceCheckResult = await checkFaceExists(selectedFile)
+    console.log(`前端: 人脸检查结果:`, faceCheckResult)
+    if (faceCheckResult.status === "failure" && faceCheckResult.exception === "活体检测未通过") {
+      setRegisterResult({
+        status: "failure",
+        exception: "活体检测未通过，请确保为真人自拍"
+      })
+      showToast("活体检测未通过，请确保为真人自拍", "error")
+      return
+    }
+    if (faceCheckResult.exists) {
       console.log("前端: 人脸已存在，阻止注册")
       setRegisterResult({
         status: "failure",
@@ -360,7 +377,7 @@ export function FaceRegistration() {
       showToast("注册成功，可以继续注册下一个用户", "success")
     } else {
       // 注册失败，保持当前状态
-      setRegisterResult(result)
+      setRegisterResult(result ?? { status: 'failure', exception: '注册失败' })
     }
   }, [handleFileUpload, reset, selectedFile])
 

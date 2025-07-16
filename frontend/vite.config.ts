@@ -11,4 +11,10 @@ export default defineConfig({
     },
   },
   plugins: [react(), TanStackRouterVite()],
+  
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8000', // 这里端口要和你后端一致
+    }
+  }
 })

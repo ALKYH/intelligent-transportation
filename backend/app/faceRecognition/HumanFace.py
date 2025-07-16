@@ -188,14 +188,10 @@ class FaceVerificationSystem:
         self.execute_query(query, (encrypted_image,))
 
 
-    def record_malicious_attack_database(self, attack_info, face_image):
+    def record_malicious_attack_database(self, attack_info):
         """记录恶意攻击"""
-        if not isinstance(face_image, bytes):
-            face_image = str(face_image).encode('utf-8')
-        base64_image = base64.b64encode(face_image)
-        encrypted_image = encrypt_data(base64_image, self.aes_key)
-        query = "INSERT INTO malicious_attacks (attack_info,face_image) VALUES (%s, %s)"
-        self.execute_query(query, (attack_info, encrypted_image))
+        query = "INSERT INTO malicious_attacks (attack_info) VALUES (%s)"
+        self.execute_query(query, (attack_info,))
 
     def check_username_exists(self, username):
         """检查用户名是否已存在"""
@@ -409,10 +405,10 @@ class FaceVerificationSystem:
         if face_image is None:
             return {"status" : "failure", "exception" : "No Detected Face"}
 
-        # 活体检测
+        # # 活体检测
         # if not self.live_detection(face_image):
         #     print("非活体检测结果，可能存在攻击行为")
-        #     self.record_malicious_attack_database(face_image)
+        #     self.save_unauthorized_face(face_image)
         #     return {"status" : "failure", "exception" : "Live detection failed"}
 
         features = self.extract_features(face_image)

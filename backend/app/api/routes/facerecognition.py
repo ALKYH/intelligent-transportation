@@ -34,11 +34,13 @@ def register_face(username: str = Form(...), file: UploadFile = File(...)):
         import numpy as np
         nparr = np.frombuffer(contents, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # 活体检测
+        if not face_system.live_detection(image):
+            return {"status": "failure", "exception": "活体检测未通过"}
         # 检测人脸区域
         face_region, _ = face_system.detect_face(image)
         if face_region is None:
             return {"status": "failure", "exception": "未检测到人脸"}
-        
         # 注册到数据库
         face_system.register_user_database(username, face_region)
         face_system.load_user_faces_database()
@@ -87,13 +89,14 @@ def check_face(file: UploadFile = File(...)):
         import numpy as np
         nparr = np.frombuffer(contents, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
+        # 活体检测
+        if not face_system.live_detection(image):
+            return {"status": "failure", "exception": "活体检测未通过"}
         # 检测人脸区域
         face_region, _ = face_system.detect_face(image)
         if face_region is None:
             print("API: 未检测到人脸")
             return {"status": "failure", "exception": "未检测到人脸"}
-        
         exists = face_system.check_face_exists(face_region)
         print(f"API: 人脸存在: {exists}")
         return {"exists": exists}

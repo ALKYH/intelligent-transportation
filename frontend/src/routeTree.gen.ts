@@ -23,6 +23,8 @@ import { Route as LayoutRoadDetectionImport } from './routes/_layout/road-detect
 import { Route as LayoutItemsImport } from './routes/_layout/items'
 import { Route as LayoutFaceRecognitionImport } from './routes/_layout/face-recognition'
 import { Route as LayoutAdminImport } from './routes/_layout/admin'
+import { Route as LayoutWarningRoadImport } from './routes/_layout/warning/road'
+import { Route as LayoutWarningFaceImport } from './routes/_layout/warning/face'
 
 // Create/Update Routes
 
@@ -86,6 +88,16 @@ const LayoutAdminRoute = LayoutAdminImport.update({
   getParentRoute: () => LayoutRoute,
 } as any)
 
+const LayoutWarningRoadRoute = LayoutWarningRoadImport.update({
+  path: '/warning/road',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
+const LayoutWarningFaceRoute = LayoutWarningFaceImport.update({
+  path: '/warning/face',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
@@ -138,6 +150,14 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexImport
       parentRoute: typeof LayoutImport
     }
+    '/_layout/warning/face': {
+      preLoaderRoute: typeof LayoutWarningFaceImport
+      parentRoute: typeof LayoutImport
+    }
+    '/_layout/warning/road': {
+      preLoaderRoute: typeof LayoutWarningRoadImport
+      parentRoute: typeof LayoutImport
+    }
   }
 }
 
@@ -152,6 +172,8 @@ export const routeTree = rootRoute.addChildren([
     LayoutSettingsRoute,
     LayoutTrafficAnalysisRoute,
     LayoutIndexRoute,
+    LayoutWarningFaceRoute,
+    LayoutWarningRoadRoute,
   ]),
   LoginRoute,
   RecoverPasswordRoute,
