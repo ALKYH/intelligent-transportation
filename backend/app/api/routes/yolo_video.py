@@ -14,6 +14,7 @@ from app.models import RoadSurfaceDetection
 from sqlmodel import Session
 from app.core.db import engine
 import copy
+from app.utils import get_beijing_time
 
 router = APIRouter(prefix="/yolo-video", tags=["yolo_video"])
 
@@ -239,7 +240,8 @@ def predict_video(file: UploadFile = File(...), fps: int = Form(1)):
                     file_data=file_data,
                     file_type=file_type,
                     disease_info=db_detection_results,  # 只存 disease_type/area/bbox
-                    alarm_status=False
+                    alarm_status=False,
+                    detection_time=get_beijing_time()
                 )
                 session.add(detection)
                 session.commit()

@@ -10,6 +10,7 @@ import base64
 from app.models import RoadSurfaceDetection
 from sqlmodel import Session
 from app.core.db import engine
+from app.utils import get_beijing_time
 
 router = APIRouter(prefix="/yolo", tags=["yolo_predict"])
 
@@ -187,7 +188,8 @@ def predict_images(files: List[UploadFile] = File(...)):
                         file_data=file_data,
                         file_type=file_type,
                         disease_info=db_detection_results,  # 只存 disease_type/area/length/bbox
-                        alarm_status=False
+                        alarm_status=False,
+                        detection_time=get_beijing_time()
                     )
                     session.add(detection)
                     session.commit()

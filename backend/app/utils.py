@@ -121,3 +121,10 @@ def verify_password_reset_token(token: str) -> str | None:
         return str(decoded_token["sub"])
     except InvalidTokenError:
         return None
+
+
+def get_beijing_time() -> datetime:
+    """
+    获取当前北京时间（东八区）
+    """
+    return datetime.utcnow() + timedelta(hours=8)
