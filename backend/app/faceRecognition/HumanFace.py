@@ -327,14 +327,21 @@ class FaceVerificationSystem:
         return aligned_face
 
     def detect_face(self, image):
-        """使用YOLO检测人脸并返回人脸区域"""
+        """使用YOLO检测人脸并返回人脸区域，返回最大的人脸区域"""
         try:
             results = self.model(image, classes=[0])  # 假设0为face类别
             if results and len(results) > 0 and results[0] and hasattr(results[0], 'boxes') and results[0].boxes:
-                # 取第一个检测到的人脸（可扩展多人脸处理）
-                box = results[0].boxes.xyxy[0].cpu().numpy().astype(int)
-                face_region = image[box[1]:box[3], box[0]:box[2]]
-                return face_region, box
+                boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
+                max_area = 0
+                max_box = None
+                for box in boxes:
+                    area = (box[2] - box[0]) * (box[3] - box[1])
+                    if area > max_area:
+                        max_area = area
+                        max_box = box
+                if max_box is not None:
+                    face_region = image[max_box[1]:max_box[3], max_box[0]:max_box[2]]
+                    return face_region, max_box
             return None, None
         except Exception as e:
             print(f"人脸检测出错: {e}")
@@ -510,10 +517,4 @@ class FaceVerificationSystem:
 if __name__ == "__main__":
 
     system = FaceVerificationSystem()
-    image_path = "ljz.png"
-    image = cv2.imread(image_path)
-    #imageFace,_ = system.detect_face(image)
-    #imageFeature = system.extract_features(imageFace)
-    #system.register_user_database("LJZ", imageFace)
-    res = system.verify_image(image)
-    print(res)
+    system.run_live_demo()
