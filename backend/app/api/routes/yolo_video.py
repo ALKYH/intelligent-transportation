@@ -14,7 +14,6 @@ from app.models import RoadSurfaceDetection
 from sqlmodel import Session
 from app.core.db import engine
 import copy
-from app.utils import get_beijing_time
 
 router = APIRouter(prefix="/yolo-video", tags=["yolo_video"])
 
@@ -30,19 +29,6 @@ CLASS_NAMES = {
     4: "修补",
     5: "坑洞"
 }
-CLASS_NAMES_EN = {
-    0: "Longitudinal Crack",
-    1: "Transverse Crack",
-    2: "Alligator Crack",
-    3: "Diagonal Crack",
-    4: "Patch",
-    5: "Pothole"
-}
-
-# 设定参考物实际长度和像素长度
-PLATE_REAL_LENGTH = 0.45  # 45厘米
-PLATE_PIXEL_LENGTH = 105   # 105像素
-GSD = PLATE_REAL_LENGTH / PLATE_PIXEL_LENGTH  # 单位：米/像素
 
 def extract_frames(video_path, output_dir, fps=1):
     """
@@ -116,8 +102,11 @@ def detect_frames(frames_dir, model):
         results = []
         for i, frame_file in enumerate(frame_files):
             frame_path = os.path.join(frames_dir, frame_file)
-            # 读取图片
-            img = cv2.imread(frame_path)
+            
+            # 读取图片为base64
+            with open(frame_path, "rb") as f:
+                img_base64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+            
             # 运行检测
             detection_results = model.predict(
                 source=frame_path,
@@ -125,48 +114,30 @@ def detect_frames(frames_dir, model):
                 conf=0.25,  # 置信度阈值
                 iou=0.45,   # NMS IoU阈值
             )
+            
             if detection_results and len(detection_results) > 0:
                 result = detection_results[0]
+                
                 if result.boxes is not None and len(result.boxes) > 0:
+                    # 统计检测结果
                     class_counts = {}
                     detections = []
-                    for idx, box in enumerate(result.boxes):
+                    
+                    for box in result.boxes:
                         cls_id = int(box.cls.item())
                         conf = float(box.conf.item())
                         xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
+                        area = (xyxy[2] - xyxy[0]) * (xyxy[3] - xyxy[1])
                         class_name = CLASS_NAMES.get(cls_id, f"未知类别({cls_id})")
-                        x1, y1, x2, y2 = xyxy
-                        box_w = x2 - x1
-                        box_h = y2 - y1
-                        real_w = box_w * GSD
-                        real_h = box_h * GSD
-                        if class_name in ["纵向裂缝", "横向裂缝", "斜向裂缝"]:
-                            real_length = max(real_w, real_h)
-                            area_or_length = {"length_m": real_length}
-                        else:
-                            real_area = real_w * real_h
-                            area_or_length = {"area_m2": real_area}
-                        detection_number = idx + 1
                         detections.append({
-                            "number": detection_number,
                             "class_id": cls_id,
                             "class_name": class_name,
-                            "class_name_en": CLASS_NAMES_EN.get(cls_id, f"Unknown({cls_id})"),
                             "confidence": conf,
                             "bbox": xyxy,
-                            **area_or_length
+                            "area": area
                         })
-                        if class_name not in class_counts:
-                            class_counts[class_name] = 0
-                        class_counts[class_name] += 1
-                        # 画框和类别+编号
-                        x1i, y1i, x2i, y2i = map(int, xyxy)
-                        cv2.rectangle(img, (x1i, y1i), (x2i, y2i), (0,0,255), 2)
-                        label = f"{CLASS_NAMES_EN.get(cls_id, f'Unknown({cls_id})')} #{detection_number}"
-                        cv2.putText(img, label, (x1i, y1i+16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
-                    # 转base64
-                    _, buffer = cv2.imencode('.jpg', img)
-                    img_base64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode()
+                    
+                    # 记录有检测结果的帧
                     results.append({
                         'frame_file': img_base64,
                         'frame_index': i,
@@ -174,7 +145,9 @@ def detect_frames(frames_dir, model):
                         'total_detections': len(result.boxes),
                         'detections': detections
                     })
+        
         return results
+        
     except Exception as e:
         raise Exception(f"检测过程中出错: {str(e)}")
 
@@ -229,32 +202,20 @@ def predict_video(file: UploadFile = File(...), fps: int = Form(1)):
             db_detection_results = []
             for frame in detection_results:
                 for det in frame.get('detections', []):
-                    class_name = det.get("class_name", "")
-                    if class_name in ["纵向裂缝", "横向裂缝", "斜向裂缝"]:
-                        length_m = det.get("length_m", 0)
-                        area_m2 = 0
-                    else:
-                        length_m = 0
-                        area_m2 = det.get("area_m2", 0)
-                    db_item = {
-                        "disease_type": class_name,
+                    db_detection_results.append({
+                        "disease_type": det.get("class_name", ""),
                         "bbox": det["bbox"],
-                        "length_m": length_m,
-                        "area_m2": area_m2
-                    }
-                    db_detection_results.append(db_item)
+                        "area": 10
+                    })
             with open(video_path, "rb") as f:
                 file_data = f.read()
-            import base64
-            file_data_base64 = base64.b64encode(file_data).decode("utf-8")
             file_type = os.path.splitext(video_path)[-1].lower().replace('.', '')
             with Session(engine) as session:
                 detection = RoadSurfaceDetection(
-                    file_data=file_data_base64,
+                    file_data=file_data,
                     file_type=file_type,
                     disease_info=db_detection_results,  # 只存 disease_type/area/bbox
-                    alarm_status=False,
-                    detection_time=get_beijing_time()
+                    alarm_status=False
                 )
                 session.add(detection)
                 session.commit()

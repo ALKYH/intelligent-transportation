@@ -155,6 +155,12 @@ export function FaceVerification() {
       console.log("前端: 验证响应数据:", data)
       setResult(data)
 
+      // 活体检测失败时给出明确提示
+      if (data.status === "failure" && (data.exception?.toLowerCase().includes("live") || data.exception?.includes("活体"))) {
+        showToast("活体检测未通过，请确保为真人自拍", "error")
+        return data
+      }
+
       if (data.status === "success") {
         showToast(data.message || "验证成功", "success")
       } else {
