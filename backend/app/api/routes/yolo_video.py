@@ -30,6 +30,11 @@ CLASS_NAMES = {
     5: "坑洞"
 }
 
+# 设定参考物实际长度和像素长度
+PLATE_REAL_LENGTH = 0.45  # 45厘米
+PLATE_PIXEL_LENGTH = 105   # 105像素
+GSD = PLATE_REAL_LENGTH / PLATE_PIXEL_LENGTH  # 单位：米/像素
+
 def extract_frames(video_path, output_dir, fps=1):
     """
     从视频中提取帧
@@ -127,16 +132,28 @@ def detect_frames(frames_dir, model):
                         cls_id = int(box.cls.item())
                         conf = float(box.conf.item())
                         xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
-                        area = (xyxy[2] - xyxy[0]) * (xyxy[3] - xyxy[1])
                         class_name = CLASS_NAMES.get(cls_id, f"未知类别({cls_id})")
+                        x1, y1, x2, y2 = xyxy
+                        box_w = x2 - x1
+                        box_h = y2 - y1
+                        real_w = box_w * GSD
+                        real_h = box_h * GSD
+                        if class_name in ["纵向裂缝", "横向裂缝", "斜向裂缝"]:
+                            real_length = max(real_w, real_h)
+                            area_or_length = {"length_m": real_length}
+                        else:
+                            real_area = real_w * real_h
+                            area_or_length = {"area_m2": real_area}
                         detections.append({
                             "class_id": cls_id,
                             "class_name": class_name,
                             "confidence": conf,
                             "bbox": xyxy,
-                            "area": area
+                            **area_or_length
                         })
-                    
+                        if class_name not in class_counts:
+                            class_counts[class_name] = 0
+                        class_counts[class_name] += 1
                     # 记录有检测结果的帧
                     results.append({
                         'frame_file': img_base64,
@@ -145,9 +162,7 @@ def detect_frames(frames_dir, model):
                         'total_detections': len(result.boxes),
                         'detections': detections
                     })
-        
         return results
-        
     except Exception as e:
         raise Exception(f"检测过程中出错: {str(e)}")
 
@@ -202,11 +217,20 @@ def predict_video(file: UploadFile = File(...), fps: int = Form(1)):
             db_detection_results = []
             for frame in detection_results:
                 for det in frame.get('detections', []):
-                    db_detection_results.append({
-                        "disease_type": det.get("class_name", ""),
+                    class_name = det.get("class_name", "")
+                    if class_name in ["纵向裂缝", "横向裂缝", "斜向裂缝"]:
+                        length_m = det.get("length_m", 0)
+                        area_m2 = 0
+                    else:
+                        length_m = 0
+                        area_m2 = det.get("area_m2", 0)
+                    db_item = {
+                        "disease_type": class_name,
                         "bbox": det["bbox"],
-                        "area": 10
-                    })
+                        "length_m": length_m,
+                        "area_m2": area_m2
+                    }
+                    db_detection_results.append(db_item)
             with open(video_path, "rb") as f:
                 file_data = f.read()
             file_type = os.path.splitext(video_path)[-1].lower().replace('.', '')
