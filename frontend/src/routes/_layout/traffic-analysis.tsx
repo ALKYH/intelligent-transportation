@@ -4,6 +4,7 @@ import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import PassengerCountChart from '../../components/Traffic_analysis/PassengerCountChart'
 import VehicleTrajectory from '../../components/Traffic_analysis/VehicleTrajectory'
 import PassengerDensityHeatMap from '../../components/Traffic_analysis/PassengerDensityHeatMap'
+import MapView from '../../components/Traffic_analysis/MapView'
 
 export const Route = createFileRoute("/_layout/traffic-analysis")({
   component: TrafficAnalysis,
@@ -20,6 +21,8 @@ function TrafficAnalysis() {
     content = <VehicleTrajectory />
   } else if (tab === "statistics") {
     content = <PassengerCountChart />
+  } else if (tab === "map-view") {
+    content = <MapView />
   }
 
   return (
