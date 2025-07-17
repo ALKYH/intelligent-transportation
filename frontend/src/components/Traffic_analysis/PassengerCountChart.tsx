@@ -4,6 +4,7 @@ import { Text, Flex, Input } from "@chakra-ui/react"
 import { Field } from '../ui/field'
 import { RadioGroup, Radio } from '../ui/radio'
 import { Button } from '../ui/button'
+import { MenuRoot, MenuTrigger, MenuContent, MenuRadioItemGroup, MenuRadioItem } from '../ui/menu'
 
 function formatDate(date: Date) {
   const y = date.getFullYear()
@@ -28,6 +29,7 @@ export default function PassengerCountChart() {
   const [occupiedTaxiLoading, setOccupiedTaxiLoading] = useState(false)
   const [chartType, setChartType] = useState<'passenger' | 'taxi'>('passenger')
   const [timeLabels, setTimeLabels] = useState<string[]>([])
+  const [selectedChart, setSelectedChart] = useState<'passenger' | 'taxi' | 'distance'>('passenger')
 
   useEffect(() => {
     const labels: string[] = []
@@ -183,6 +185,23 @@ export default function PassengerCountChart() {
   return (
     <>
       <Flex align="center" gap={4} mb={2}>
+        <Field label="选择图表">
+          <MenuRoot>
+            <MenuTrigger asChild>
+              <Button variant="outline" minW={36}>
+                {selectedChart === 'passenger' ? '乘客数量分布' :
+                 selectedChart === 'taxi' ? '载客车辆分布' : '路程分析'}
+              </Button>
+            </MenuTrigger>
+            <MenuContent>
+              <MenuRadioItemGroup value={selectedChart} onValueChange={(e) => setSelectedChart(e.value as 'passenger' | 'taxi' | 'distance')}>
+                <MenuRadioItem value="passenger">乘客数量分布</MenuRadioItem>
+                <MenuRadioItem value="taxi">载客车辆分布</MenuRadioItem>
+                <MenuRadioItem value="distance">路程分析</MenuRadioItem>
+              </MenuRadioItemGroup>
+            </MenuContent>
+          </MenuRoot>
+        </Field>
         <Field label="选择日期">
           <Input
             type="date"
@@ -201,32 +220,29 @@ export default function PassengerCountChart() {
             <Radio value="1h">1小时</Radio>
           </RadioGroup>
         </Field>
-        <Field label="图表类型">
-          <RadioGroup value={chartType} onValueChange={e => setChartType(e.value as 'passenger' | 'taxi')} direction="row">
-            <Radio value="passenger">乘车人数分布</Radio>
-            <Radio value="taxi">载客车辆分布</Radio>
-          </RadioGroup>
-        </Field>
       </Flex>
       {/* 图表展示区 */}
-      {chartType === 'passenger' ? (
+      {selectedChart === 'passenger' && (
         <>
           <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}乘客数量分布图：</Text>
-            <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
-
-        </>
-      ) : (
-        <>
-          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}载客车辆分布图：</Text>
-            <ReactECharts style={{height: 400}} option={occupiedTaxiOption} notMerge={true} lazyUpdate={true} />
+          <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
         </>
       )}
-      {/* 路程分析饼图展示，放在地图上方 */}
-      <Text mt={8} mb={2} fontWeight="bold">路程分析：</Text>
-      {date && distanceData && pieOption ? (
-        <ReactECharts style={{height: 400}} option={pieOption} notMerge={true} lazyUpdate={true} />
-      ) : (
-        <Text>请选择日期后查看路程分析</Text>
+      {selectedChart === 'taxi' && (
+        <>
+          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}载客车辆分布图：</Text>
+          <ReactECharts style={{height: 400}} option={occupiedTaxiOption} notMerge={true} lazyUpdate={true} />
+        </>
+      )}
+      {selectedChart === 'distance' && (
+        <>
+          <Text mb={2} fontWeight="bold">路程分析：</Text>
+          {date && distanceData && pieOption ? (
+            <ReactECharts style={{height: 400}} option={pieOption} notMerge={true} lazyUpdate={true} />
+          ) : (
+            <Text>请选择日期后查看路程分析</Text>
+          )}
+        </>
       )}
     </>
   )

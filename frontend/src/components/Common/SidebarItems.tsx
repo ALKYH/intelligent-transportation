@@ -29,6 +29,7 @@ const trafficAnalysisSubItems = [
   { title: "车辆轨迹可视化", tab: "vehicle-trajectory" },
   { title: "统计数据", tab: "statistics" },
   { title: "地图查看", tab: "map-view" },
+  { title: "道路拥堵状况", tab: "congestion-status" },
 ]
 
 const warningSubItems = [

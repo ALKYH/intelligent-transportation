@@ -137,6 +137,7 @@ class TaxiOrder(SQLModel, table=True):
     offutc: str = Field(max_length=32)   # 下车时间戳（UTC时间类型）
     offlat: float                         # 下车点纬度坐标
     offlon: float                         # 下车点经度坐标
+    distance: float | None = Field(default=None)  # 行驶距离（米）
 
 class RoadSurfaceDetection(SQLModel, table=True):
     __tablename__ = "road_surface_detection"
@@ -146,3 +147,11 @@ class RoadSurfaceDetection(SQLModel, table=True):
     disease_info: Any = Field(sa_column=Column(JSONB, nullable=False))
     detection_time: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     alarm_status: bool = Field(default=False, nullable=False)
+
+
+class Weather(SQLModel, table=True):
+    Time_new: str = Field(max_length=255, primary_key=True)
+    Temperature: float | None = Field(default=None)
+    Humidity: int | None = Field(default=None)
+    Wind_Speed: int | None = Field(default=None)
+    Precip: float | None = Field(default=None)

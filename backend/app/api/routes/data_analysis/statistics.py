@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query
 from datetime import datetime, timedelta
 from sqlmodel import Session, select
 from app.core.db import engine
-from app.models import TaxiOrder, GPSRecord
+from app.models import TaxiOrder, GPSRecord, Weather
 from typing import Literal
 import csv
 from fastapi.responses import JSONResponse
@@ -277,3 +277,31 @@ def import_taxi_orders():
             status_code=500,
             content={"error": f"导入失败: {str(e)}"}
         ) 
+
+@router.get("/weather-info")
+def weather_info(
+    date: str = Query(..., description="日期，格式为YYYY-MM-DD")
+):
+    """
+    查询指定日期当天每一小时的天气信息
+    """
+    try:
+        with Session(engine) as session:
+            # 假设Time_new格式为YYYY-MM-DD HH:MM:SS，取date开头的所有记录
+            results = session.exec(select(Weather).where(Weather.Time_new.startswith(date))).all()
+            if results:
+                weather_list = [
+                    {
+                        "Time_new": w.Time_new,
+                        "Temperature": w.Temperature,
+                        "Humidity": w.Humidity,
+                        "Wind_Speed": w.Wind_Speed,
+                        "Precip": w.Precip
+                    }
+                    for w in results
+                ]
+                return {"weather": weather_list}
+            else:
+                return JSONResponse(status_code=404, content={"error": "未找到该日期的天气信息"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"查询天气信息失败: {str(e)}"}) 
