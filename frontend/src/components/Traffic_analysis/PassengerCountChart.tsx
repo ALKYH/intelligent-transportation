@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import ReactECharts from 'echarts-for-react'
-import { Text, Flex, Input } from "@chakra-ui/react"
+import { Text, Flex, Input, Container, Heading } from "@chakra-ui/react"
 import { Field } from '../ui/field'
 import { RadioGroup, Radio } from '../ui/radio'
 import { Button } from '../ui/button'
@@ -29,7 +29,7 @@ export default function PassengerCountChart() {
   const [occupiedTaxiLoading, setOccupiedTaxiLoading] = useState(false)
   const [chartType, setChartType] = useState<'passenger' | 'taxi'>('passenger')
   const [timeLabels, setTimeLabels] = useState<string[]>([])
-  const [selectedChart, setSelectedChart] = useState<'passenger' | 'taxi' | 'distance' | 'speed'>('passenger')
+  const [selectedChart, setSelectedChart] = useState<'passenger' | 'taxi' | 'distance' | 'speed' | 'combined'>('passenger')
   const [weatherData, setWeatherData] = useState<any[]>([])
   const [speedData, setSpeedData] = useState<any[]>([])
   const [speedLoading, setSpeedLoading] = useState(false)
@@ -274,8 +274,88 @@ export default function PassengerCountChart() {
     ]
   }
 
+  const combinedOption = {
+    title: { text: '乘客数/载客车辆/平均速度/温度 综合分布', left: 'center' },
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['乘客数', '载客车辆', '平均速度', '温度'], bottom: 0 },
+    xAxis: {
+      type: 'category',
+      data: interval === '1h' ? hourLabels : timeLabels,
+      name: '时间',
+      axisLabel: { rotate: 45 }
+    },
+    yAxis: [
+      { type: 'value', name: '乘客数', minInterval: 1, position: 'left' },
+      { type: 'value', name: '载客车辆', minInterval: 1, position: 'right', offset: 0, show: false },
+      { type: 'value', name: '平均速度(km/h)', position: 'right', offset: 60, show: false },
+      { type: 'value', name: '温度(℃)', position: 'right', offset: 120, show: false }
+    ],
+    series: [
+      {
+        name: '乘客数',
+        type: 'line',
+        yAxisIndex: 0,
+        data: (interval === '1h' ? hourLabels : timeLabels).map(label => {
+          const item = statData.find(d => {
+            const itemLabel = interval === '15min'
+              ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
+              : d.interval_start.slice(8, 10) + ':00'
+            return itemLabel === label
+          })
+          return item ? item.count : null
+        }),
+        smooth: true,
+        areaStyle: {},
+      },
+      {
+        name: '载客车辆',
+        type: 'line',
+        yAxisIndex: 1,
+        data: (interval === '1h' ? hourLabels : timeLabels).map(label => {
+          const item = occupiedTaxiData.find((d: any) => {
+            const itemLabel = interval === '15min'
+              ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
+              : d.interval_start.slice(8, 10) + ':00'
+            return itemLabel === label
+          })
+          return item ? item.occupied_taxi_count : null
+        }),
+        smooth: true,
+      },
+      {
+        name: '平均速度',
+        type: 'line',
+        yAxisIndex: 2,
+        data: (interval === '1h' ? hourLabels : timeLabels).map(label => {
+          const item = speedData.find(d => {
+            const itemLabel = interval === '15min'
+              ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
+              : d.interval_start.slice(8, 10) + ':00'
+            return itemLabel === label
+          })
+          return item ? item.avg_speed_kmh : null
+        }),
+        smooth: true,
+      },
+      {
+        name: '温度',
+        type: 'line',
+        yAxisIndex: 3,
+        data: (interval === '1h' ? hourLabels : timeLabels).map(label => {
+          const hour = label.slice(0, 2)
+          const item = weatherData.find(w => getHour(w.Time_new) === hour)
+          return item ? item.Temperature : null
+        }),
+        smooth: true,
+        lineStyle: { color: '#f39c12' },
+        itemStyle: { color: '#f39c12' },
+      }
+    ]
+  }
+
   return (
-    <>
+    <Container maxW="full" mt={0}>
+      <Heading size="md" mb={4}>统计数据</Heading>
       <Flex align="center" gap={4} mb={2}>
         <Field label="选择图表">
           <MenuRoot>
@@ -283,15 +363,17 @@ export default function PassengerCountChart() {
               <Button variant="outline" minW={36}>
                 {selectedChart === 'passenger' ? '乘客数量分布' :
                  selectedChart === 'taxi' ? '载客车辆分布' :
-                 selectedChart === 'distance' ? '路程分析' : '平均速度分布'}
+                 selectedChart === 'distance' ? '路程分析' :
+                 selectedChart === 'speed' ? '平均速度分布' : '综合分布'}
               </Button>
             </MenuTrigger>
             <MenuContent>
-              <MenuRadioItemGroup value={selectedChart} onValueChange={(e) => setSelectedChart(e.value as 'passenger' | 'taxi' | 'distance' | 'speed')}>
+              <MenuRadioItemGroup value={selectedChart} onValueChange={(e) => setSelectedChart(e.value as 'passenger' | 'taxi' | 'distance' | 'speed' | 'combined')}>
                 <MenuRadioItem value="passenger">乘客数量分布</MenuRadioItem>
                 <MenuRadioItem value="taxi">载客车辆分布</MenuRadioItem>
                 <MenuRadioItem value="distance">路程分析</MenuRadioItem>
                 <MenuRadioItem value="speed">平均速度分布</MenuRadioItem>
+                <MenuRadioItem value="combined">综合分布</MenuRadioItem>
               </MenuRadioItemGroup>
             </MenuContent>
           </MenuRoot>
@@ -308,7 +390,7 @@ export default function PassengerCountChart() {
             w={40}
           />
         </Field>
-        {['passenger', 'taxi', 'speed'].includes(selectedChart) && (
+        {['passenger', 'taxi', 'speed', 'combined'].includes(selectedChart) && (
           <Field label="时间间隔">
             <RadioGroup 
               value={interval} 
@@ -351,6 +433,12 @@ export default function PassengerCountChart() {
           <ReactECharts style={{height: 400}} option={speedOption} notMerge={true} lazyUpdate={true} />
         </>
       )}
-    </>
+      {selectedChart === 'combined' && (
+        <>
+          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}综合分布图：</Text>
+          <ReactECharts style={{height: 400}} option={combinedOption} notMerge={true} lazyUpdate={true} />
+        </>
+      )}
+    </Container>
   )
 } 

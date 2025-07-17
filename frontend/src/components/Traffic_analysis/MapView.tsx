@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react"
 import ReactECharts from 'echarts-for-react'
+import { Container, Text, Heading } from "@chakra-ui/react"
 
 const jinanPopulation = [
   { name: '历下区', value: 78 },
@@ -62,17 +63,15 @@ const MapView = () => {
   }, [])
 
   return (
-    <div>
-      <h2>地图查看页面</h2>
-      <div style={{ marginTop: 24 }}>
-        <strong>济南市地图：</strong>
-        {mapLoaded && mapOption ? (
-          <ReactECharts style={{height: 500}} option={mapOption} notMerge={true} lazyUpdate={true} />
-        ) : (
-          <div>地图加载中...</div>
-        )}
-      </div>
-    </div>
+    <Container maxW="full" mt={0}>
+      <Heading size="md" mb={4}>地图查看</Heading>
+      <Text mb={2} fontWeight="bold">济南市地图：</Text>
+      {mapLoaded && mapOption ? (
+        <ReactECharts style={{height: 500}} option={mapOption} notMerge={true} lazyUpdate={true} />
+      ) : (
+        <Text>地图加载中...</Text>
+      )}
+    </Container>
   )
 }
 

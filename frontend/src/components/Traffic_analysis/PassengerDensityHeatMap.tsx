@@ -5,22 +5,24 @@ import { Button } from '../ui/button'
 
 export default function PassengerDensityHeatMap() {
   const mapRef = useRef<HTMLDivElement>(null)
-  const [startUtc, setStartUtc] = useState("20130912011417")
-  const [endUtc, setEndUtc] = useState("20130912042835")
+  const [startUtc, setStartUtc] = useState("20130912000000")
+  const [endUtc, setEndUtc] = useState("20130913000000")
   // 保存热力图实例
   const heatmapOverlayRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
   // 分析状态提示
   const [analyzing, setAnalyzing] = useState(false)
   // 日期时间选择器状态
-  const [selectedDateTime, setSelectedDateTime] = useState("2013-09-12T01:14:17")
-  const [selectedEndDateTime, setSelectedEndDateTime] = useState("2013-09-12T04:28:35")
+  const [selectedDateTime, setSelectedDateTime] = useState("2013-09-12T00:00:00")
+  const [selectedEndDateTime, setSelectedEndDateTime] = useState("2013-09-13T00:00:00")
   // 动画相关
   const [playing, setPlaying] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [timeSteps, setTimeSteps] = useState<string[]>([])
   const [currentTimeLabel, setCurrentTimeLabel] = useState<string>("")
   const timerRef = useRef<any>(null)
+  // eps和min_samples固定
+  const [intervalMin, setIntervalMin] = useState("15")
 
   // 将日期时间转换为UTC时间戳
   const convertDateTimeToUtc = (dateTimeStr: string) => {
@@ -147,7 +149,7 @@ export default function PassengerDensityHeatMap() {
       const y = +curStart.slice(0,4), m = +curStart.slice(4,6)-1, d = +curStart.slice(6,8)
       const H = +curStart.slice(8,10), M = +curStart.slice(10,12), S = +curStart.slice(12,14)
       const date = new Date(y, m, d, H, M, S)
-      date.setMinutes(date.getMinutes() + 15)
+      date.setMinutes(date.getMinutes() + Number(intervalMin))
       const curEnd = date.getFullYear().toString().padStart(4,'0') +
         (date.getMonth()+1).toString().padStart(2,'0') +
         date.getDate().toString().padStart(2,'0') +
@@ -191,7 +193,7 @@ export default function PassengerDensityHeatMap() {
     setCurrentTimeLabel("")
     if (timerRef.current) clearTimeout(timerRef.current)
     // 生成所有时间步
-    const steps = splitTimeRange(startUtc, endUtc, 15)
+    const steps = splitTimeRange(startUtc, endUtc, Number(intervalMin))
     setTimeSteps(steps)
     setPlaying(true)
     setAnalyzing(false)
@@ -231,12 +233,21 @@ export default function PassengerDensityHeatMap() {
               }}
             />
           </Field>
+          <Field label="分析间隔(分钟)">
+            <input
+              type="number"
+              min={1}
+              value={intervalMin}
+              onChange={e => setIntervalMin(e.target.value)}
+              style={{ height: 32, borderRadius: 4, border: '1px solid #ccc', padding: '0 8px', width: 100 }}
+            />
+          </Field>
         </HStack>
         {/* 分析参数说明 */}
         <Box border="1px solid" borderColor="gray.200" borderRadius="md" p={4}>
           <Text fontWeight="bold" mb={3}>分析参数</Text>
           <Text fontSize="sm" color="gray.600">
-            使用DBSCAN聚类算法分析热门上客点，eps=0.03，min_samples=3
+            使用DBSCAN聚类算法分析热门上客点
           </Text>
         </Box>
         <Button
@@ -264,21 +275,6 @@ export default function PassengerDensityHeatMap() {
         borderRadius="md"
         mb={4}
       />
-      {/* 热力图说明 */}
-      <Box
-        bg="blue.50"
-        p={4}
-        borderRadius="md"
-        border="1px solid"
-        borderColor="blue.200"
-      >
-        <Text fontWeight="bold" mb={2}>热力图说明</Text>
-        <Text fontSize="sm" color="blue.700">
-          <strong>红色区域：</strong>交通流量密集，乘客上下车频繁<br/>
-          <strong>黄色区域：</strong>交通流量中等，有一定乘客活动<br/>
-          <strong>绿色区域：</strong>交通流量较少，乘客活动稀疏
-        </Text>
-      </Box>
     </Container>
   )
 }
