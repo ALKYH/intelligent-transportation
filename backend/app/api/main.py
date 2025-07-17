@@ -10,6 +10,7 @@ from app.api.routes.yolo_video import router as yolo_video_router
 from app.api.routes.data_analysis.clustering import router as clustering_router
 from app.api.routes.data_analysis.statistics import router as statistics_router
 from app.api.routes.data_analysis.trajectory import router as trajectory_router
+from app.api.routes.data_analysis.congestion import router as congestion_router
 from app.api.routes.logger import router as logger_router
 from app.api.routes import alarm_process
 api_router = APIRouter()
@@ -25,5 +26,6 @@ api_router.include_router(yolo_video_router)
 api_router.include_router(clustering_router)
 api_router.include_router(statistics_router)
 api_router.include_router(trajectory_router)
+api_router.include_router(congestion_router)
 api_router.include_router(logger_router)
 api_router.include_router(alarm_process.router)

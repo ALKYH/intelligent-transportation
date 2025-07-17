@@ -4,6 +4,7 @@ import { Text, Flex, Input } from "@chakra-ui/react"
 import { Field } from '../ui/field'
 import { RadioGroup, Radio } from '../ui/radio'
 import { Button } from '../ui/button'
+import { MenuRoot, MenuTrigger, MenuContent, MenuRadioItemGroup, MenuRadioItem } from '../ui/menu'
 
 function formatDate(date: Date) {
   const y = date.getFullYear()
@@ -28,6 +29,8 @@ export default function PassengerCountChart() {
   const [occupiedTaxiLoading, setOccupiedTaxiLoading] = useState(false)
   const [chartType, setChartType] = useState<'passenger' | 'taxi'>('passenger')
   const [timeLabels, setTimeLabels] = useState<string[]>([])
+  const [selectedChart, setSelectedChart] = useState<'passenger' | 'taxi' | 'distance'>('passenger')
+  const [weatherData, setWeatherData] = useState<any[]>([])
 
   useEffect(() => {
     const labels: string[] = []
@@ -70,19 +73,42 @@ export default function PassengerCountChart() {
       .finally(() => setOccupiedTaxiLoading(false))
   }, [interval, date])
 
+  useEffect(() => {
+    if (!date) return
+    fetch(`http://localhost:8000/api/v1/analysis/weather-info?date=${date}`)
+      .then(res => res.json())
+      .then(data => setWeatherData(data.weather || []))
+      .catch(() => setWeatherData([]))
+  }, [date])
+
+  const hourLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
+  // 获取小时部分
+  const getHour = (str: string) => str.slice(11, 13)
+  const temperatureSeries = (interval === '1h' ? hourLabels : timeLabels).map(label => {
+    const hour = label.slice(0, 2)
+    const item = weatherData.find(w => getHour(w.Time_new) === hour)
+    return item ? item.Temperature : null
+  })
+
   const statOption = {
-    title: { text: `${interval === '15min' ? '15分钟' : '1小时'}乘客数量分布`, left: 'center' },
+    title: { text: '乘客数量与温度', left: 'center' },
     tooltip: { trigger: 'axis' },
+    legend: { data: ['乘客数', '温度'], bottom: 0 },
     xAxis: {
       type: 'category',
-      data: timeLabels,
+      data: interval === '1h' ? hourLabels : timeLabels,
       name: '时间',
       axisLabel: { rotate: 45 }
     },
-    yAxis: { type: 'value', name: '乘客数量' },
+    yAxis: [
+      { type: 'value', name: '乘客数量' },
+      { type: 'value', name: '温度(℃)', position: 'right' }
+    ],
     series: [
       {
-        data: timeLabels.map(label => {
+        name: '乘客数',
+        type: 'line',
+        data: (interval === '1h' ? hourLabels : timeLabels).map(label => {
           const item = statData.find(d => {
             const itemLabel = interval === '15min'
               ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
@@ -91,10 +117,19 @@ export default function PassengerCountChart() {
           })
           return item ? item.count : null
         }),
-        type: 'line',
+        yAxisIndex: 0,
         smooth: true,
         areaStyle: {},
-        name: '乘客数'
+      },
+      {
+        name: '温度',
+        type: 'line',
+        data: temperatureSeries,
+        yAxisIndex: 1,
+        smooth: true,
+        symbol: 'circle',
+        lineStyle: { color: '#f39c12' },
+        itemStyle: { color: '#f39c12' },
       }
     ]
   }
@@ -152,18 +187,24 @@ export default function PassengerCountChart() {
 
   // occupiedTaxiOption 需要放在组件函数体内，且依赖于 occupiedTaxiData 和 interval
   const occupiedTaxiOption = {
-    title: { text: `${interval === '15min' ? '15分钟' : '1小时'}载客车数量分布`, left: 'center' },
+    title: { text: '载客车数量与温度', left: 'center' },
     tooltip: { trigger: 'axis' },
+    legend: { data: ['载客车数', '温度'], bottom: 0 },
     xAxis: {
       type: 'category',
-      data: timeLabels,
+      data: interval === '1h' ? hourLabels : timeLabels,
       name: '时间',
       axisLabel: { rotate: 45 }
     },
-    yAxis: { type: 'value', name: '载客车数量' },
+    yAxis: [
+      { type: 'value', name: '载客车数量' },
+      { type: 'value', name: '温度(℃)', position: 'right' }
+    ],
     series: [
       {
-        data: timeLabels.map(label => {
+        name: '载客车数',
+        type: 'line',
+        data: (interval === '1h' ? hourLabels : timeLabels).map(label => {
           const item = occupiedTaxiData.find((d: any) => {
             const itemLabel = interval === '15min'
               ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
@@ -172,10 +213,19 @@ export default function PassengerCountChart() {
           })
           return item ? item.occupied_taxi_count : null
         }),
-        type: 'line',
+        yAxisIndex: 0,
         smooth: true,
         areaStyle: {},
-        name: '载客车数'
+      },
+      {
+        name: '温度',
+        type: 'line',
+        data: temperatureSeries,
+        yAxisIndex: 1,
+        smooth: true,
+        symbol: 'circle',
+        lineStyle: { color: '#f39c12' },
+        itemStyle: { color: '#f39c12' },
       }
     ]
   }
@@ -183,6 +233,23 @@ export default function PassengerCountChart() {
   return (
     <>
       <Flex align="center" gap={4} mb={2}>
+        <Field label="选择图表">
+          <MenuRoot>
+            <MenuTrigger asChild>
+              <Button variant="outline" minW={36}>
+                {selectedChart === 'passenger' ? '乘客数量分布' :
+                 selectedChart === 'taxi' ? '载客车辆分布' : '路程分析'}
+              </Button>
+            </MenuTrigger>
+            <MenuContent>
+              <MenuRadioItemGroup value={selectedChart} onValueChange={(e) => setSelectedChart(e.value as 'passenger' | 'taxi' | 'distance')}>
+                <MenuRadioItem value="passenger">乘客数量分布</MenuRadioItem>
+                <MenuRadioItem value="taxi">载客车辆分布</MenuRadioItem>
+                <MenuRadioItem value="distance">路程分析</MenuRadioItem>
+              </MenuRadioItemGroup>
+            </MenuContent>
+          </MenuRoot>
+        </Field>
         <Field label="选择日期">
           <Input
             type="date"
@@ -196,37 +263,39 @@ export default function PassengerCountChart() {
           />
         </Field>
         <Field label="时间间隔">
-          <RadioGroup value={interval} onValueChange={e => setInterval(e.value as '15min' | '1h')} direction="row">
-            <Radio value="15min">15分钟</Radio>
-            <Radio value="1h">1小时</Radio>
-          </RadioGroup>
-        </Field>
-        <Field label="图表类型">
-          <RadioGroup value={chartType} onValueChange={e => setChartType(e.value as 'passenger' | 'taxi')} direction="row">
-            <Radio value="passenger">乘车人数分布</Radio>
-            <Radio value="taxi">载客车辆分布</Radio>
+          <RadioGroup 
+            value={interval} 
+            onValueChange={e => setInterval(e.value as '15min' | '1h')} 
+            direction="row" 
+            style={{ gap: 24 }} // 增大按钮间距
+          >
+            <Radio value="15min" style={{ height: 28, fontSize: 13, padding: '0 8px' }}>15分钟</Radio>
+            <Radio value="1h" style={{ height: 28, fontSize: 13, padding: '0 8px' }}>1小时</Radio>
           </RadioGroup>
         </Field>
       </Flex>
       {/* 图表展示区 */}
-      {chartType === 'passenger' ? (
+      {selectedChart === 'passenger' && (
         <>
-          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}乘客数量分布图：</Text>
-            <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
-
-        </>
-      ) : (
-        <>
-          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}载客车辆分布图：</Text>
-            <ReactECharts style={{height: 400}} option={occupiedTaxiOption} notMerge={true} lazyUpdate={true} />
+          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}乘客数量与温度分布图：</Text>
+          <ReactECharts style={{height: 400}} option={statOption} notMerge={true} lazyUpdate={true} />
         </>
       )}
-      {/* 路程分析饼图展示，放在地图上方 */}
-      <Text mt={8} mb={2} fontWeight="bold">路程分析：</Text>
-      {date && distanceData && pieOption ? (
-        <ReactECharts style={{height: 400}} option={pieOption} notMerge={true} lazyUpdate={true} />
-      ) : (
-        <Text>请选择日期后查看路程分析</Text>
+      {selectedChart === 'taxi' && (
+        <>
+          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}载客车辆与温度分布图：</Text>
+          <ReactECharts style={{height: 400}} option={occupiedTaxiOption} notMerge={true} lazyUpdate={true} />
+        </>
+      )}
+      {selectedChart === 'distance' && (
+        <>
+          <Text mb={2} fontWeight="bold">路程分析：</Text>
+          {date && distanceData && pieOption ? (
+            <ReactECharts style={{height: 400}} option={pieOption} notMerge={true} lazyUpdate={true} />
+          ) : (
+            <Text>请选择日期后查看路程分析</Text>
+          )}
+        </>
       )}
     </>
   )

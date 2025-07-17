@@ -153,7 +153,9 @@ def predict_images(files: List[UploadFile] = File(...)):
                         x1i, y1i, x2i, y2i = map(int, xyxy)
                         cv2.rectangle(img, (x1i, y1i), (x2i, y2i), (0,0,255), 2)
                         label = CLASS_NAMES_EN.get(cls_id, f"Unknown({cls_id})")
-                        cv2.putText(img, label, (x1i, y1i+16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                        # 动态调整字体大小，保证大图下文字可读
+                        font_scale = max(img.shape[1] / 1000, 0.6)  # 1000可根据实际图片分辨率调整
+                        cv2.putText(img, label, (x1i, y1i+16), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,255), 2)
                 # 转base64
                 _, buffer = cv2.imencode('.jpg', img)
                 img_base64 = base64.b64encode(buffer).decode()
