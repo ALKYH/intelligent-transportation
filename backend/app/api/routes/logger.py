@@ -29,7 +29,6 @@ def read_road_detection(detection_id: int):
 @router.get("/road-surface-detection", response_model=list)
 def read_all_road_detections():
     results = logger.get_road_surface_detection()
-    print(results)
     return results
 
 @router.put("/road-surface-detection/{detection_id}", response_model=dict)
