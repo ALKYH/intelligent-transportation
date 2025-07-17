@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { OpenAPI } from '@/client';
-import { createFileRoute, useRouteContext } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 
 const VerifyEmail: React.FC = () => {
-    const routeContext = useRouteContext();
     const [status, setStatus] = useState<string>('验证中...');
     // 正确获取 token 的方式
-    const token = routeContext?.current?.searchParams?.get('token') || null;
+    const token = new URLSearchParams(window.location.search).get("token");
+    console.log(token)
 
 
     useEffect(() => {
@@ -14,7 +14,7 @@ const VerifyEmail: React.FC = () => {
             const verifyEmail = async () => {
                 try {
                     // Call the backend verification interface
-                    const response = await fetch(`${OpenAPI.BASE}/api/verify-email/?token=${token}`, {
+                    const response = await fetch(`${OpenAPI.BASE}/api/v1/verify-email/?token=${token}`, {
                         method: 'GET',
                     });
 
