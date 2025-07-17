@@ -16,7 +16,7 @@ const CongestionStatus = () => {
 
   // 示例：默认时间范围（可根据实际需求调整或做成可选）
   const start_utc = "20130912000000"
-  const end_utc = "20130912010000"
+  const end_utc = "20130912001000"
 
   useEffect(() => {
     setLoading(true)
