@@ -178,43 +178,6 @@ def occupied_taxi_count_distribution(
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"统计载客出租车数量分布失败: {str(e)}"})
 
-@router.post("/import-gps-data")
-def import_gps_data():
-    filepath = "/app/data/csv/converted_jn0912.csv"
-    batch_size = 1000
-    total = 0
-    max_rows = 3000
-    try:
-        with Session(engine) as session:
-            with open(filepath, encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                batch = []
-                for row in reader:
-                    if total >= max_rows:
-                        break
-                    record = GPSRecord(
-                        commaddr=row["COMMADDR"],
-                        utc=row["UTC"],
-                        lat=float(row["LAT"]),
-                        lon=float(row["LON"]),
-                        head=float(row["HEAD"]),
-                        speed=float(row["SPEED"]),
-                        tflag=int(row["TFLAG"]),
-                    )
-                    batch.append(record)
-                    if len(batch) >= batch_size:
-                        session.add_all(batch)
-                        session.commit()
-                        total += len(batch)
-                        batch.clear()
-                if batch and total < max_rows:
-                    remain = min(len(batch), max_rows - total)
-                    session.add_all(batch[:remain])
-                    session.commit()
-                    total += remain
-        return {"message": f"成功导入{total}条GPS数据"}
-    except Exception as e:
-        return {"error": str(e)} 
 
 @router.post("/import-taxi-orders")
 def import_taxi_orders():
@@ -305,3 +268,84 @@ def weather_info(
                 return JSONResponse(status_code=404, content={"error": "未找到该日期的天气信息"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"查询天气信息失败: {str(e)}"}) 
+
+@router.get("/time-interval-stats")
+def time_interval_stats(
+    interval: Literal["15min", "1h"] = Query("1h", description="统计间隔，可选15min或1h"),
+    date: str = Query(None, description="指定日期，格式为YYYYMMDD")
+):
+    """
+    统计每个时间段的平均距离和平均耗时
+    """
+    if interval == "15min":
+        bucket_sql = (
+            "SUBSTRING(onutc, 1, 8) || SUBSTRING(onutc, 9, 2) || "
+            "LPAD((FLOOR(CAST(SUBSTRING(onutc, 11, 2) AS INTEGER) / 15) * 15)::text, 2, '0') || '00'"
+        )
+        delta = timedelta(minutes=15)
+    else:
+        bucket_sql = "SUBSTRING(onutc, 1, 8) || SUBSTRING(onutc, 9, 2) || '0000'"
+        delta = timedelta(hours=1)
+    where_clause = "WHERE onutc IS NOT NULL AND offutc IS NOT NULL AND distance IS NOT NULL"
+    params = {}
+    if date:
+        where_clause += " AND SUBSTRING(onutc, 1, 8) = :date"
+        params["date"] = date
+    # 计算耗时（秒）：offutc - onutc
+    sql = text(f"""
+        SELECT {bucket_sql} AS interval_start,
+               AVG(
+                   CASE 
+                       WHEN 
+                           (CAST(SUBSTRING(offutc, 9, 2) AS INTEGER) * 3600 + 
+                            CAST(SUBSTRING(offutc, 11, 2) AS INTEGER) * 60 + 
+                            CAST(SUBSTRING(offutc, 13, 2) AS INTEGER)) - 
+                           (CAST(SUBSTRING(onutc, 9, 2) AS INTEGER) * 3600 + 
+                            CAST(SUBSTRING(onutc, 11, 2) AS INTEGER) * 60 + 
+                            CAST(SUBSTRING(onutc, 13, 2) AS INTEGER)) > 0
+                       THEN
+                           CASE
+                               WHEN distance /
+                                   ((CAST(SUBSTRING(offutc, 9, 2) AS INTEGER) * 3600 + 
+                                     CAST(SUBSTRING(offutc, 11, 2) AS INTEGER) * 60 + 
+                                     CAST(SUBSTRING(offutc, 13, 2) AS INTEGER)) - 
+                                    (CAST(SUBSTRING(onutc, 9, 2) AS INTEGER) * 3600 + 
+                                     CAST(SUBSTRING(onutc, 11, 2) AS INTEGER) * 60 + 
+                                     CAST(SUBSTRING(onutc, 13, 2) AS INTEGER))) <= 22.22
+                               THEN distance /
+                                   ((CAST(SUBSTRING(offutc, 9, 2) AS INTEGER) * 3600 + 
+                                     CAST(SUBSTRING(offutc, 11, 2) AS INTEGER) * 60 + 
+                                     CAST(SUBSTRING(offutc, 13, 2) AS INTEGER)) - 
+                                    (CAST(SUBSTRING(onutc, 9, 2) AS INTEGER) * 3600 + 
+                                     CAST(SUBSTRING(onutc, 11, 2) AS INTEGER) * 60 + 
+                                     CAST(SUBSTRING(onutc, 13, 2) AS INTEGER)))
+                               ELSE NULL
+                           END
+                       ELSE NULL
+                   END
+               ) AS avg_speed_mps,
+               COUNT(*) AS count
+        FROM taxiorder
+        {where_clause}
+        GROUP BY interval_start
+        ORDER BY interval_start
+    """)
+    result = []
+    try:
+        with Session(engine) as session:
+            rows = session.execute(sql, params).fetchall()
+            for row in rows:
+                k = row[0]
+                start_dt = parse_utc_timestamp(k)
+                end_dt = start_dt + delta
+                avg_speed_mps = float(row[1]) if row[1] is not None else None
+                avg_speed_kmh = round(avg_speed_mps * 3.6, 2) if avg_speed_mps is not None else None
+                result.append({
+                    "interval_start": k,
+                    "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
+                    "avg_speed_kmh": avg_speed_kmh,
+                    "order_count": row[2]
+                })
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"统计时段平均速度失败: {str(e)}"}) 

@@ -29,8 +29,10 @@ export default function PassengerCountChart() {
   const [occupiedTaxiLoading, setOccupiedTaxiLoading] = useState(false)
   const [chartType, setChartType] = useState<'passenger' | 'taxi'>('passenger')
   const [timeLabels, setTimeLabels] = useState<string[]>([])
-  const [selectedChart, setSelectedChart] = useState<'passenger' | 'taxi' | 'distance'>('passenger')
+  const [selectedChart, setSelectedChart] = useState<'passenger' | 'taxi' | 'distance' | 'speed'>('passenger')
   const [weatherData, setWeatherData] = useState<any[]>([])
+  const [speedData, setSpeedData] = useState<any[]>([])
+  const [speedLoading, setSpeedLoading] = useState(false)
 
   useEffect(() => {
     const labels: string[] = []
@@ -80,6 +82,15 @@ export default function PassengerCountChart() {
       .then(data => setWeatherData(data.weather || []))
       .catch(() => setWeatherData([]))
   }, [date])
+
+  useEffect(() => {
+    setSpeedLoading(true)
+    fetch(`http://localhost:8000/api/v1/analysis/time-interval-stats?interval=${interval}&date=${formatDateParam(date)}`)
+      .then(res => res.json())
+      .then(data => setSpeedData(data))
+      .catch(() => setSpeedData([]))
+      .finally(() => setSpeedLoading(false))
+  }, [interval, date])
 
   const hourLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
   // 获取小时部分
@@ -230,6 +241,39 @@ export default function PassengerCountChart() {
     ]
   }
 
+  const speedOption = {
+    title: { text: '平均速度分布', left: 'center' },
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['平均速度'], bottom: 0 },
+    xAxis: {
+      type: 'category',
+      data: interval === '1h' ? hourLabels : timeLabels,
+      name: '时间',
+      axisLabel: { rotate: 45 }
+    },
+    yAxis: [
+      { type: 'value', name: '平均速度(km/h)' }
+    ],
+    series: [
+      {
+        name: '平均速度',
+        type: 'line',
+        data: (interval === '1h' ? hourLabels : timeLabels).map(label => {
+          const item = speedData.find(d => {
+            const itemLabel = interval === '15min'
+              ? d.interval_start.slice(8, 10) + ':' + d.interval_start.slice(10, 12)
+              : d.interval_start.slice(8, 10) + ':00'
+            return itemLabel === label
+          })
+          return item ? item.avg_speed_kmh : null
+        }),
+        yAxisIndex: 0,
+        smooth: true,
+        areaStyle: {},
+      }
+    ]
+  }
+
   return (
     <>
       <Flex align="center" gap={4} mb={2}>
@@ -238,14 +282,16 @@ export default function PassengerCountChart() {
             <MenuTrigger asChild>
               <Button variant="outline" minW={36}>
                 {selectedChart === 'passenger' ? '乘客数量分布' :
-                 selectedChart === 'taxi' ? '载客车辆分布' : '路程分析'}
+                 selectedChart === 'taxi' ? '载客车辆分布' :
+                 selectedChart === 'distance' ? '路程分析' : '平均速度分布'}
               </Button>
             </MenuTrigger>
             <MenuContent>
-              <MenuRadioItemGroup value={selectedChart} onValueChange={(e) => setSelectedChart(e.value as 'passenger' | 'taxi' | 'distance')}>
+              <MenuRadioItemGroup value={selectedChart} onValueChange={(e) => setSelectedChart(e.value as 'passenger' | 'taxi' | 'distance' | 'speed')}>
                 <MenuRadioItem value="passenger">乘客数量分布</MenuRadioItem>
                 <MenuRadioItem value="taxi">载客车辆分布</MenuRadioItem>
                 <MenuRadioItem value="distance">路程分析</MenuRadioItem>
+                <MenuRadioItem value="speed">平均速度分布</MenuRadioItem>
               </MenuRadioItemGroup>
             </MenuContent>
           </MenuRoot>
@@ -262,17 +308,19 @@ export default function PassengerCountChart() {
             w={40}
           />
         </Field>
-        <Field label="时间间隔">
-          <RadioGroup 
-            value={interval} 
-            onValueChange={e => setInterval(e.value as '15min' | '1h')} 
-            direction="row" 
-            style={{ gap: 24 }} // 增大按钮间距
-          >
-            <Radio value="15min" style={{ height: 28, fontSize: 13, padding: '0 8px' }}>15分钟</Radio>
-            <Radio value="1h" style={{ height: 28, fontSize: 13, padding: '0 8px' }}>1小时</Radio>
-          </RadioGroup>
-        </Field>
+        {['passenger', 'taxi', 'speed'].includes(selectedChart) && (
+          <Field label="时间间隔">
+            <RadioGroup 
+              value={interval} 
+              onValueChange={e => setInterval(e.value as '15min' | '1h')} 
+              direction="row" 
+              style={{ gap: 24 }} // 增大按钮间距
+            >
+              <Radio value="15min" style={{ height: 28, fontSize: 13, padding: '0 8px' }}>15分钟</Radio>
+              <Radio value="1h" style={{ height: 28, fontSize: 13, padding: '0 8px' }}>1小时</Radio>
+            </RadioGroup>
+          </Field>
+        )}
       </Flex>
       {/* 图表展示区 */}
       {selectedChart === 'passenger' && (
@@ -295,6 +343,12 @@ export default function PassengerCountChart() {
           ) : (
             <Text>请选择日期后查看路程分析</Text>
           )}
+        </>
+      )}
+      {selectedChart === 'speed' && (
+        <>
+          <Text mb={2} color="gray.500">下方为{interval === '15min' ? '15分钟' : '1小时'}平均速度分布图：</Text>
+          <ReactECharts style={{height: 400}} option={speedOption} notMerge={true} lazyUpdate={true} />
         </>
       )}
     </>
