@@ -182,18 +182,62 @@ class FaceVerificationSystem:
 
     def record_unauthorized_user_database(self, face_image):
         """记录未授权用户"""
-        if not isinstance(face_image, bytes):
+        # 如果是np.ndarray，先编码为jpg字节流
+        if isinstance(face_image, np.ndarray):
+            success, img_encoded = cv2.imencode('.jpg', face_image)
+            if not success:
+                print("图片编码失败")
+                return
+            face_image = img_encoded.tobytes()
+        elif not isinstance(face_image, bytes):
+            # 兜底：转为bytes
             face_image = str(face_image).encode('utf-8')
         base64_image = base64.b64encode(face_image)
         encrypted_image = encrypt_data(base64_image, self.aes_key)
         query = "INSERT INTO unauthorized_users (face_image) VALUES (%s)"
         self.execute_query(query, (encrypted_image,))
 
+    def get_unauthorized_users(self):
+        """获取未认证用户记录，返回时对图片进行解密、还原为ndarray、编码为图片并base64输出"""
+        query = "SELECT id, face_image, detected_at FROM unauthorized_users"
+        results = self.execute_query(query)
+        decoded_results = []
+        for row in results:
+            id = row[0]
+            face_image = row[1]
+            detected_at = row[2]
+            decrypted_image = decrypt_data(face_image, self.aes_key)
+            if decrypted_image:
+                new_row = {
+                    "id": id,
+                    "face_image": decrypted_image,
+                    "detected_at": detected_at.strftime("%Y-%m-%d %H:%M:%S") if detected_at else None
+                }
+                decoded_results.append(new_row)
+            else:
+                decoded_results.append({
+                    "id": id,
+                    "face_image": "",
+                    "detected_at": detected_at.strftime("%Y-%m-%d %H:%M:%S") if detected_at else None
+                })
+        return decoded_results
 
-    def record_malicious_attack_database(self, attack_info):
+
+    def record_malicious_attack_database(self, attack_info,face_image):
         """记录恶意攻击"""
-        query = "INSERT INTO malicious_attacks (attack_info) VALUES (%s)"
-        self.execute_query(query, (attack_info,))
+        # 如果是np.ndarray，先编码为jpg字节流
+        if isinstance(face_image, np.ndarray):
+            success, img_encoded = cv2.imencode('.jpg', face_image)
+            if not success:
+                print("图片编码失败")
+                return
+            face_image = img_encoded.tobytes()
+        elif not isinstance(face_image, bytes):
+            # 兜底：转为bytes
+            face_image = str(face_image).encode('utf-8')
+        base64_image = base64.b64encode(face_image)
+        query = "INSERT INTO malicious_attacks (attack_info,face_image) VALUES (%s,%s)"
+        self.execute_query(query, (attack_info,base64_image))
 
     def check_username_exists(self, username):
         """检查用户名是否已存在"""
@@ -440,7 +484,7 @@ class FaceVerificationSystem:
                         min_distance = face_distances[best_match_index]  # 更新最小距离
 
                         # 使用 face_recognition 的 compare_faces 判断是否匹配
-                        matches = compare_faces(known_encodings, features, tolerance=0.5)
+                        matches = compare_faces(known_encodings, features, tolerance=0.3)
                         if matches[best_match_index]:
                             best_match = list(self.user_feature_db.keys())[best_match_index]
             except Exception as e:
@@ -519,4 +563,3 @@ class FaceVerificationSystem:
 if __name__ == "__main__":
 
     system = FaceVerificationSystem()
-    system.run_live_demo()

@@ -103,3 +103,8 @@ def check_face(file: UploadFile = File(...)):
     except Exception as e:
         print(f"API: 检查人脸失败: {e}")
         return {"status": "failure", "exception": str(e)}
+
+@router.get("/unauthorized-users", response_model=list)
+def read_all_unauthorized_users():
+    results = face_system.get_unauthorized_users()
+    return results

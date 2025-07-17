@@ -137,21 +137,7 @@ class Logger:
         else:
             query = "SELECT * FROM malicious_attacks"
             results = self.execute_query(query)
-        
-        decoded_results = []
-        for row in results:
-            if 'face_image' in row:
-                decrypted_image = decrypt_data(row['face_image'], self.aes_key)
-                if decrypted_image:
-                    decoded_image = base64.b64decode(decrypted_image)
-                    new_row = row.copy()
-                    new_row['face_image'] = decoded_image
-                    decoded_results.append(new_row)
-                else:
-                    decoded_results.append(row)
-            else:
-                decoded_results.append(row)
-        return decoded_results
+        return results
 
     def update_malicious_attack(self, id, attack_info=None, face_image=None):
         """更新恶意攻击记录，人脸图片需先进行 Base64 编码再 AES 加密"""
@@ -178,6 +164,7 @@ class Logger:
         """删除恶意攻击记录"""
         query = "DELETE FROM malicious_attacks WHERE id = %s"
         return self.execute_query(query, (id,))
+
 
     def __del__(self):
         """关闭数据库连接"""
