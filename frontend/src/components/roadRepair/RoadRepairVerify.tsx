@@ -100,6 +100,21 @@ export default function RoadRepairVerify() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 在组件内增加状态
+  const [repairImage, setRepairImage] = useState<File | null>(null);
+  const [repairing, setRepairing] = useState(false);
+  const [repairResult, setRepairResult] = useState<string | null>(null);
+  const [alarmStatus, setAlarmStatus] = useState(false);
+  // 在组件内增加图片预览状态
+  const [repairImagePreview, setRepairImagePreview] = useState<string | null>(null);
+
+  // 在 roadDetection 加载后同步 alarmStatus
+  useEffect(() => {
+    if (roadDetection && typeof roadDetection.alarm_status === 'boolean') {
+      setAlarmStatus(roadDetection.alarm_status);
+    }
+  }, [roadDetection]);
+
   // 摄像头相关
   const startCamera = async () => {
     try {
@@ -173,7 +188,7 @@ export default function RoadRepairVerify() {
       // formData.append("id", id || ""); // 如需传id可解开
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
-      const res = await fetch(`${apiUrl}/api/v1/face-recognition/verify-face`, {
+      const res = await fetch(`${apiUrl}/face-recognition/verify-face`, {
         method: "POST",
         body: formData,
         signal: controller.signal,
@@ -206,6 +221,47 @@ export default function RoadRepairVerify() {
     } finally {
       setIsFaceLoading(false);
       stopCamera();
+    }
+  };
+
+  // 上传图片选择
+  const handleRepairImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setRepairImage(file);
+      // 生成本地预览
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setRepairImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 提交修复检测
+  const handleRepairSubmit = async () => {
+    if (!repairImage || !id) return;
+    setRepairing(true);
+    setRepairResult(null);
+    const formData = new FormData();
+    formData.append("alarm_id", id);
+    formData.append("file", repairImage);
+    try {
+      const res = await fetch(`${apiUrl}/alarm/process`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.repaired) {
+        setRepairResult("处理成功，病害已修复！");
+        setAlarmStatus(true);
+      } else {
+        setRepairResult(data.msg || "处理失败，仍检测到病害");
+      }
+    } catch (e) {
+      setRepairResult("请求失败");
+    } finally {
+      setRepairing(false);
     }
   };
 
@@ -377,6 +433,54 @@ export default function RoadRepairVerify() {
           </Box>
         )}
       </Field>
+      {faceOk && !alarmStatus && (
+        <Box mt={6} p={4} bg="gray.50" borderRadius="md">
+          <Text fontWeight="bold" mb={2}>上传修复后路面照片</Text>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleRepairImageChange}
+            disabled={repairing}
+          />
+          {repairImagePreview && (
+            <Box mt={2}>
+              <Text fontSize="sm" color="gray.600">修复后照片预览：</Text>
+              <img
+                src={repairImagePreview}
+                alt="修复后照片预览"
+                style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid #eee" }}
+              />
+            </Box>
+          )}
+          <Button
+            mt={2}
+            colorScheme="blue"
+            onClick={handleRepairSubmit}
+            loading={repairing}
+            disabled={!repairImage}
+          >
+            提交检测
+          </Button>
+          {repairResult && (
+            <Text mt={2} color={repairResult.includes("成功") ? "green.500" : "red.500"}>
+              {repairResult}
+            </Text>
+          )}
+        </Box>
+      )}
+      {alarmStatus && repairImagePreview && (
+        <Box mt={2}>
+          <Text fontSize="sm" color="gray.600">修复后照片预览：</Text>
+          <img
+            src={repairImagePreview}
+            alt="修复后照片预览"
+            style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid #eee" }}
+          />
+        </Box>
+      )}
+      {alarmStatus && (
+        <Text mt={4} color="green.600" fontWeight="bold">该告警已处理</Text>
+      )}
     </Box>
   );
 }
