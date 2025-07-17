@@ -82,10 +82,10 @@ services:
       - ./backend/htmlcov:/app/htmlcov
       - ./backend/data:/app/data
     environment:
-      SMTP_HOST: "mailcatcher"
-      SMTP_PORT: "1025"
+      SMTP_HOST: "smtp.163.com"
+      SMTP_PORT: "994"
       SMTP_TLS: "false"
-      EMAILS_FROM_EMAIL: "noreply@example.com"
+      EMAILS_FROM_EMAIL: "nobyoq@163.com"
 
   mailcatcher:
     image: schickling/mailcatcher

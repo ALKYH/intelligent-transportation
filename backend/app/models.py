@@ -1,11 +1,15 @@
 import uuid
+from datetime import datetime
 
+from psycopg2._psycopg import Column
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import Column, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
+
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 # Shared properties
@@ -44,6 +48,15 @@ class UpdatePassword(SQLModel):
 
 
 # Database model, database table inferred from class name
+class EmailVerification(SQLModel, table=True):
+    __tablename__ = "email_verification"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, nullable=False)
+    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
+    verification_token: str = Field(max_length=255, unique=True, nullable=False)
+    is_verified: bool = Field(default=False)
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
