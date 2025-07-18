@@ -245,7 +245,7 @@ export default function RoadRepairVerify() {
     setRepairResult(null);
     const formData = new FormData();
     formData.append("alarm_id", id);
-    formData.append("file", repairImage);
+    formData.append("files", repairImage); // 这里改为 files
     try {
       const res = await fetch(`${apiUrl}/alarm/process`, {
         method: "POST",
