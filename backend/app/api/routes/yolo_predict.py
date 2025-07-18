@@ -188,16 +188,18 @@ def predict_images(files: List[UploadFile] = File(...)):
                         "area_m2": area_m2
                     }
                     db_detection_results.append(db_item)
-                with Session(engine) as session:
-                    detection = RoadSurfaceDetection(
-                        file_data=file_data_base64,  # 存base64字符串
-                        file_type=file_type,
-                        disease_info=db_detection_results,  # 只存 disease_type/area/length/bbox
-                        alarm_status=False,
-                        detection_time=get_beijing_time()
-                    )
-                    session.add(detection)
-                    session.commit()
+                # 只有检测到病害时才插入告警
+                if db_detection_results:
+                    with Session(engine) as session:
+                        detection = RoadSurfaceDetection(
+                            file_data=file_data_base64,  # 存base64字符串
+                            file_type=file_type,
+                            disease_info=db_detection_results,  # 只存 disease_type/area/length/bbox
+                            alarm_status=False,
+                            detection_time=get_beijing_time()
+                        )
+                        session.add(detection)
+                        session.commit()
         return {"results": results_list}
     except Exception as e:
         print("批量检测异常:", str(e))

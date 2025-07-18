@@ -101,7 +101,8 @@ export default function RoadRepairVerify() {
   const [error, setError] = useState<string | null>(null);
 
   // 在组件内增加状态
-  const [repairImage, setRepairImage] = useState<File | null>(null);
+  const [repairImages, setRepairImages] = useState<File[]>([]);
+  const [repairImagePreviews, setRepairImagePreviews] = useState<string[]>([]);
   const [repairing, setRepairing] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
   const [alarmStatus, setAlarmStatus] = useState(false);
@@ -227,25 +228,28 @@ export default function RoadRepairVerify() {
   // 上传图片选择
   const handleRepairImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setRepairImage(file);
-      // 生成本地预览
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setRepairImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const files = Array.from(e.target.files);
+      setRepairImages(files);
+      // 生成多张图片预览
+      const readers = files.map(file => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      });
+      Promise.all(readers).then(setRepairImagePreviews);
     }
   };
 
   // 提交修复检测
   const handleRepairSubmit = async () => {
-    if (!repairImage || !id) return;
+    if (repairImages.length === 0 || !id) return;
     setRepairing(true);
     setRepairResult(null);
     const formData = new FormData();
     formData.append("alarm_id", id);
-    formData.append("files", repairImage); // 这里改为 files
+    repairImages.forEach(file => formData.append("files", file));
     try {
       const res = await fetch(`${apiUrl}/alarm/process`, {
         method: "POST",
@@ -339,16 +343,25 @@ export default function RoadRepairVerify() {
             )}
             <Text><b>病害信息:</b></Text>
             {Array.isArray(roadDetection.disease_info) && roadDetection.disease_info.length > 0 ? (
-              roadDetection.disease_info.map((item: any, idx: number) => (
-                <Box key={idx} pl={4} mb={2} borderLeft="2px solid #eee">
-                  <Text>类型: {item.disease_type}</Text>
-                  {typeof item.area_m2 === "number" && item.area_m2 !== 0 ? (
-                    <Text>面积: {item.area_m2.toFixed(2)} m²</Text>
-                  ) : typeof item.length_m === "number" && item.length_m !== 0 ? (
-                    <Text>长度: {item.length_m.toFixed(2)} m</Text>
-                  ) : null}
-                </Box>
-              ))
+              (() => {
+                // 只统计各类型数量
+                const stats: Record<string, number> = {};
+                roadDetection.disease_info.forEach((item: any) => {
+                  const type = item.disease_type;
+                  if (!stats[type]) stats[type] = 0;
+                  stats[type]++;
+                });
+                return (
+                  <Box pl={4}>
+                    {Object.entries(stats).map(([type, count]) => (
+                      <Box key={type} mb={2} borderLeft="2px solid #eee" pl={2}>
+                        <Text>类型: {type}</Text>
+                        <Text>数量: {count}</Text>
+                      </Box>
+                    ))}
+                  </Box>
+                );
+              })()
             ) : (
               <Text color="gray.500" pl={4}>无病害信息</Text>
             )}
@@ -439,17 +452,20 @@ export default function RoadRepairVerify() {
           <input
             type="file"
             accept="image/*"
+            multiple
             onChange={handleRepairImageChange}
             disabled={repairing}
           />
-          {repairImagePreview && (
-            <Box mt={2}>
-              <Text fontSize="sm" color="gray.600">修复后照片预览：</Text>
-              <img
-                src={repairImagePreview}
-                alt="修复后照片预览"
-                style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid #eee" }}
-              />
+          {repairImagePreviews.length > 0 && (
+            <Box mt={2} display="flex" flexWrap="wrap" gap={2}>
+              {repairImagePreviews.map((src, idx) => (
+                <img
+                  key={idx}
+                  src={src}
+                  alt={`修复后照片预览${idx+1}`}
+                  style={{ maxWidth: 120, borderRadius: 8, border: "1px solid #eee" }}
+                />
+              ))}
             </Box>
           )}
           <Button
@@ -457,7 +473,7 @@ export default function RoadRepairVerify() {
             colorScheme="blue"
             onClick={handleRepairSubmit}
             loading={repairing}
-            disabled={!repairImage}
+            disabled={repairImages.length === 0}
           >
             提交检测
           </Button>
