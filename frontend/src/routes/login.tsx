@@ -47,6 +47,8 @@ function Login() {
 
     resetError()
 
+    window.alert("验证邮件已发送到您的邮箱中")
+
     try {
       await loginMutation.mutateAsync(data)
     } catch {
@@ -83,7 +85,7 @@ function Login() {
               id="username"
               {...register("username", {
                 required: "邮箱是必填项",
-                pattern: { value: emailPattern, message: "邮箱格式不正确" },
+                pattern: emailPattern,
               })}
               placeholder="邮箱"
               type="email"
