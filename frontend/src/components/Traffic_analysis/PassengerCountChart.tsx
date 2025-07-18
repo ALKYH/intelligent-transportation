@@ -14,7 +14,13 @@ function formatDate(date: Date) {
 }
 
 function formatDateParam(date: string) {
-  return date.replace(/-/g, '')
+  // 将北京时间date转为UTC日期字符串（YYYYMMDD）
+  const local = new Date(date + 'T00:00:00+08:00')
+  const utc = new Date(local.getTime() - 8 * 3600 * 1000)
+  const y = utc.getUTCFullYear()
+  const m = String(utc.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(utc.getUTCDate()).padStart(2, '0')
+  return `${y}${m}${d}`
 }
 
 export default function PassengerCountChart() {
