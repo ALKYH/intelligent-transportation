@@ -11,6 +11,9 @@ from sqlalchemy import text
 def parse_utc_timestamp(utc_str: str) -> datetime:
     return datetime.strptime(utc_str, "%Y%m%d%H%M%S")
 
+def utc_to_beijing(dt: datetime) -> datetime:
+    return dt + timedelta(hours=8)
+
 router = APIRouter(prefix="/analysis", tags=["analysis-statistics"])
 
 @router.get("/passenger-count-distribution")
@@ -48,10 +51,10 @@ def passenger_count_distribution(
             rows = session.execute(sql, params).fetchall()
             for row in rows:
                 k = row[0]
-                start_dt = parse_utc_timestamp(k)
+                start_dt = utc_to_beijing(parse_utc_timestamp(k))
                 end_dt = start_dt + delta
                 result.append({
-                    "interval_start": k,
+                    "interval_start": start_dt.strftime("%Y%m%d%H%M%S"),
                     "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
                     "count": row[1]
                 })
@@ -167,10 +170,10 @@ def occupied_taxi_count_distribution(
             rows = session.execute(sql, params).fetchall()
             for row in rows:
                 k = row[0]
-                start_dt = parse_utc_timestamp(k)
+                start_dt = utc_to_beijing(parse_utc_timestamp(k))
                 end_dt = start_dt + delta
                 result.append({
-                    "interval_start": k,
+                    "interval_start": start_dt.strftime("%Y%m%d%H%M%S"),
                     "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
                     "occupied_taxi_count": row[1]
                 })
@@ -336,12 +339,12 @@ def time_interval_stats(
             rows = session.execute(sql, params).fetchall()
             for row in rows:
                 k = row[0]
-                start_dt = parse_utc_timestamp(k)
+                start_dt = utc_to_beijing(parse_utc_timestamp(k))
                 end_dt = start_dt + delta
                 avg_speed_mps = float(row[1]) if row[1] is not None else None
                 avg_speed_kmh = round(avg_speed_mps * 3.6, 2) if avg_speed_mps is not None else None
                 result.append({
-                    "interval_start": k,
+                    "interval_start": start_dt.strftime("%Y%m%d%H%M%S"),
                     "interval_end": end_dt.strftime("%Y%m%d%H%M%S"),
                     "avg_speed_kmh": avg_speed_kmh,
                     "order_count": row[2]
