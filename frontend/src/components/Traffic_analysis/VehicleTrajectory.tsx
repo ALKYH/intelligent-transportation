@@ -3,9 +3,9 @@ import { Box, Container, Heading, Text, Flex, Input, Button, VStack, HStack } fr
 import { Field } from '../ui/field'
 
 export default function VehicleTrajectory() {
-  const [commaddr, setCommaddr] = useState("")
-  const [startDateTime, setStartDateTime] = useState("2013-09-12T01:00:00")
-  const [endDateTime, setEndDateTime] = useState("2013-09-12T02:00:00")
+  const [commaddr, setCommaddr] = useState("15053110001")
+  const [startDateTime, setStartDateTime] = useState("2013-09-13T12:00:00")
+  const [endDateTime, setEndDateTime] = useState("2013-09-13T14:00:00")
   const [loading, setLoading] = useState(false)
   const [trajectoryData, setTrajectoryData] = useState<any[]>([])
   const mapRef = useRef<HTMLDivElement>(null)

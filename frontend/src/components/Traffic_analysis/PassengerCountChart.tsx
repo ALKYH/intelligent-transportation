@@ -27,7 +27,7 @@ export default function PassengerCountChart() {
   const [statData, setStatData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [interval, setInterval] = useState<'15min' | '1h'>('15min')
-  const [date, setDate] = useState(formatDate(new Date('2013-09-12')))
+  const [date, setDate] = useState(formatDate(new Date('2013-09-13')))
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapOption, setMapOption] = useState<any>(null)
   const [distanceData, setDistanceData] = useState<any>(null)
