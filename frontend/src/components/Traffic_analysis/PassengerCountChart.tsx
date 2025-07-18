@@ -14,14 +14,20 @@ function formatDate(date: Date) {
 }
 
 function formatDateParam(date: string) {
-  return date.replace(/-/g, '')
+  // 将北京时间date转为UTC日期字符串（YYYYMMDD）
+  const local = new Date(date + 'T00:00:00+08:00')
+  const utc = new Date(local.getTime() - 8 * 3600 * 1000)
+  const y = utc.getUTCFullYear()
+  const m = String(utc.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(utc.getUTCDate()).padStart(2, '0')
+  return `${y}${m}${d}`
 }
 
 export default function PassengerCountChart() {
   const [statData, setStatData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [interval, setInterval] = useState<'15min' | '1h'>('15min')
-  const [date, setDate] = useState(formatDate(new Date('2013-09-12')))
+  const [date, setDate] = useState(formatDate(new Date('2013-09-13')))
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapOption, setMapOption] = useState<any>(null)
   const [distanceData, setDistanceData] = useState<any>(null)

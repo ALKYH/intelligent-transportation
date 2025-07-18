@@ -431,11 +431,17 @@ class FaceVerificationSystem:
     def live_detection(self, face_image):
         """调用百度 API 进行活体检测"""
         try:
+            print("开始活体检测...")
             # 将 np.ndarray 转换为 JPEG 格式的字节数据
             _, buffer = cv2.imencode('.jpg', face_image)
             # 将字节数据进行 base64 编码
             img_base64 = base64.b64encode(buffer).decode('utf-8')
-            url = f"https://aip.baidubce.com/rest/2.0/face/v3/faceverify?access_token={self.get_access_token()}"
+            print(f"图片编码完成，base64长度: {len(img_base64)}")
+            
+            access_token = self.get_access_token()
+            print(f"获取到access_token: {access_token[:20]}...")
+            
+            url = f"https://aip.baidubce.com/rest/2.0/face/v3/faceverify?access_token={access_token}"
             headers = {"Content-Type": "application/json"}
             # 修正请求数据格式，符合百度人脸验证 API 要求
             payload = json.dumps([
@@ -444,13 +450,29 @@ class FaceVerificationSystem:
                     "image_type": "BASE64",
                 }
             ],ensure_ascii=False)
+            print(f"准备发送请求到: {url}")
+            print(f"请求payload长度: {len(payload)}")
+            
             response = requests.request("POST", url, headers=headers, data=payload.encode("utf-8"))
-            print(response.text)
+            print(f"API响应状态码: {response.status_code}")
+            print(f"API响应内容: {response.text}")
+            
             result = response.json()
+            print(f"解析后的响应: {result}")
+            
             if result.get('error_code') == 0:
-                return result['result']['face_list'][0]['face_probability'] > 0.8  # 假设置信度大于 0.8 为活体
+                face_probability = result['result']['face_liveness']
+                print(f"活体检测置信度: {face_probability}")
+                is_live = face_probability > 0.8
+                print(f"活体检测结果: {'通过' if is_live else '未通过'}")
+                return is_live
+            else:
+                print(f"API返回错误: {result.get('error_msg', '未知错误')}")
+                return False
         except Exception as e:
             print(f"活体检测出错: {e}")
+            import traceback
+            print(f"详细错误信息: {traceback.format_exc()}")
         return False
 
     def verify_face(self, face_image):
@@ -458,11 +480,11 @@ class FaceVerificationSystem:
         if face_image is None:
             return {"status" : "failure", "exception" : "No Detected Face"}
 
-        # # 活体检测
-        # if not self.live_detection(face_image):
-        #     print("非活体检测结果，可能存在攻击行为")
-        #     self.save_unauthorized_face(face_image)
-        #     return {"status" : "failure", "exception" : "Live detection failed"}
+        # 活体检测
+        if not self.live_detection(face_image):
+            print("非活体检测结果，可能存在攻击行为")
+            self.record_malicious_attack_database("Live detection failed",face_image)
+            return {"status" : "failure", "exception" : "Live detection failed"}
 
         features = self.extract_features(face_image)
         if features is None:

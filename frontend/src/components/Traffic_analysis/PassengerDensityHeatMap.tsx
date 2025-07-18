@@ -5,16 +5,16 @@ import { Button } from '../ui/button'
 
 export default function PassengerDensityHeatMap() {
   const mapRef = useRef<HTMLDivElement>(null)
-  const [startUtc, setStartUtc] = useState("20130912000000")
-  const [endUtc, setEndUtc] = useState("20130913000000")
+  const [startUtc, setStartUtc] = useState("20130913100000")
+  const [endUtc, setEndUtc] = useState("20130913140000")
   // 保存热力图实例
   const heatmapOverlayRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
   // 分析状态提示
   const [analyzing, setAnalyzing] = useState(false)
   // 日期时间选择器状态
-  const [selectedDateTime, setSelectedDateTime] = useState("2013-09-12T00:00:00")
-  const [selectedEndDateTime, setSelectedEndDateTime] = useState("2013-09-13T00:00:00")
+  const [selectedDateTime, setSelectedDateTime] = useState("2013-09-13T10:00:00")
+  const [selectedEndDateTime, setSelectedEndDateTime] = useState("2013-09-13T14:00:00")
   // 动画相关
   const [playing, setPlaying] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
